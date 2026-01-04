@@ -1,5 +1,5 @@
 import React from "react";
-import { Lobby, Winner, Stat } from "./types";
+import { Lobby, Winner, Stat } from "@/lib/types";
 
 export const LOBBIES: Lobby[] = [
   {
