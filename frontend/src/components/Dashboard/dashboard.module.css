@@ -1,0 +1,13 @@
+.scrollContainer {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.scrollContainer::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.spotlightMask {
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.68);
+}
+
