@@ -196,141 +196,86 @@ export default function DashboardClient() {
     <div className="min-h-screen bg-background text-white">
       {/* DESKTOP APP SHELL */}
       {isDesktop ? (
-        <div className="min-h-screen flex">
-          <aside className="w-72 shrink-0 border-r border-white/5 bg-surface/20 backdrop-blur-xl">
-            <div className="h-16 px-6 flex items-center gap-3 border-b border-white/5">
-              <div className="size-10 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(0,238,255,0.18)]">
-                <span className="font-black">N</span>
-              </div>
-              <div className="leading-tight">
-                <div className="text-sm font-black tracking-tight">
-                  INVERSE{" "}
-                  <span className="text-transparent bg-clip-text bg-linear-to-r from-primary via-accent to-secondary text-glow">
-                    ARENA
-                  </span>
-                </div>
-                <div className="text-[10px] text-white/50 font-bold uppercase tracking-widest">
-                  dashboard
-                </div>
-              </div>
+        <div className="min-h-screen flex flex-col">
+          {/* Desktop header */}
+          <header className="h-16 px-8 flex items-center justify-between border-b border-white/5 bg-background/60 backdrop-blur-xl sticky top-0 z-20">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-black tracking-tight">Dashboard</h1>
+              <span className="text-xs text-white/50">
+                Live Round #8492 • Ends in 00:45
+              </span>
             </div>
 
-            <nav className="px-3 py-4 space-y-1">
-              {[
-                { icon: "home", label: "Lobby", active: true },
-                { icon: "stadia_controller", label: "Games" },
-                { icon: "leaderboard", label: "Rank" },
-                { icon: "person", label: "Profile" },
-                { icon: "settings", label: "Settings" },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-colors ${
-                    item.active
-                      ? "bg-white/5 text-primary border border-primary/20"
-                      : "text-white/70 hover:text-white hover:bg-white/5 border border-transparent"
-                  }`}
-                >
-                  <span className="size-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                    <Icon
-                      name={item.icon}
-                      fill={item.active}
-                      className="text-[20px]"
-                    />
-                  </span>
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-          </aside>
-
-          <div className="flex-1 min-w-0 flex flex-col">
-            {/* Desktop header */}
-            <header className="h-16 px-8 flex items-center justify-between border-b border-white/5 bg-background/60 backdrop-blur-xl sticky top-0 z-20">
-              <div className="flex items-center gap-3">
-                <h1 className="text-lg font-black tracking-tight">Dashboard</h1>
-                <span className="text-xs text-white/50">
-                  Live Round #8492 • Ends in 00:45
-                </span>
-              </div>
-
-              {/* Wallet Pill - Step 1 Target */}
-              <div
-                id="wallet-pill"
-                className="flex items-center gap-2 bg-surface border border-white/10 rounded-full pl-2 pr-4 py-1.5 shadow-lg"
-              >
-                <div className="flex items-center justify-center size-7 rounded-full bg-primary/20 text-primary">
-                  <Icon name="account_balance_wallet" className="text-[18px]" />
-                </div>
-                <span className="text-sm font-bold tracking-wide text-white">
-                  $2,450.00
-                </span>
-              </div>
-            </header>
-
-            {/* Desktop content */}
-            <main
-              id="dashboard-scroll"
-              className={`${styles.scrollContainer} flex-1 overflow-y-auto px-8 py-8`}
+            {/* Wallet Pill - Step 1 Target */}
+            <div
+              id="wallet-pill"
+              className="flex items-center gap-2 bg-surface border border-white/10 rounded-full pl-2 pr-4 py-1.5 shadow-lg"
             >
-              <div className="max-w-6xl mx-auto">
-                <div className="flex items-end justify-between mb-6">
-                  <div>
-                    <div className="text-xs font-black tracking-[0.25em] text-primary/80 uppercase">
-                      Lobby
-                    </div>
-                    <h2 className="text-3xl font-black tracking-tight mt-2">
-                      Choose Your Mode
-                    </h2>
-                  </div>
-                  <button
-                    className="text-xs text-white/60 hover:text-white"
-                    onClick={() => setTutorialStep(0)}
-                  >
-                    Restart onboarding
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-12 gap-6">
-                  <section className="col-span-7 space-y-4">
-                    <ModeCard
-                      mode={LOBBY_MODES[0]}
-                      isPrimary
-                      onAction={handleModeAction}
-                    />
-                    <ModeCard
-                      mode={LOBBY_MODES[1]}
-                      onAction={handleModeAction}
-                    />
-                    <ModeCard
-                      mode={LOBBY_MODES[2]}
-                      onAction={handleModeAction}
-                    />
-                  </section>
-
-                  <aside className="col-span-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="size-2 rounded-full bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)]" />
-                        <h3 className="text-lg font-black tracking-tight">
-                          Live Games
-                        </h3>
-                      </div>
-                      <button className="text-xs font-black text-primary hover:text-[#33f2ff]">
-                        View all
-                      </button>
-                    </div>
-
-                    <div id="live-games" className="space-y-3">
-                      {LIVE_GAMES.map((g) => (
-                        <LiveGameRow key={g.id} game={g} />
-                      ))}
-                    </div>
-                  </aside>
-                </div>
+              <div className="flex items-center justify-center size-7 rounded-full bg-primary/20 text-primary">
+                <Icon name="account_balance_wallet" className="text-[18px]" />
               </div>
-            </main>
-          </div>
+              <span className="text-sm font-bold tracking-wide text-white">
+                $2,450.00
+              </span>
+            </div>
+          </header>
+
+          {/* Desktop content */}
+          <main
+            id="dashboard-scroll"
+            className={`${styles.scrollContainer} flex-1 overflow-y-auto px-8 py-8`}
+          >
+            <div className="max-w-6xl mx-auto">
+              <div className="flex items-end justify-between mb-6">
+                <div>
+                  <div className="text-xs font-black tracking-[0.25em] text-primary/80 uppercase">
+                    Lobby
+                  </div>
+                  <h2 className="text-3xl font-black tracking-tight mt-2">
+                    Choose Your Mode
+                  </h2>
+                </div>
+                <button
+                  className="text-xs text-white/60 hover:text-white"
+                  onClick={() => setTutorialStep(0)}
+                >
+                  Restart onboarding
+                </button>
+              </div>
+
+              <div className="grid grid-cols-12 gap-6">
+                <section className="col-span-7 space-y-4">
+                  <ModeCard
+                    mode={LOBBY_MODES[0]}
+                    isPrimary
+                    onAction={handleModeAction}
+                  />
+                  <ModeCard mode={LOBBY_MODES[1]} onAction={handleModeAction} />
+                  <ModeCard mode={LOBBY_MODES[2]} onAction={handleModeAction} />
+                </section>
+
+                <aside className="col-span-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)]" />
+                      <h3 className="text-lg font-black tracking-tight">
+                        Live Games
+                      </h3>
+                    </div>
+                    <button className="text-xs font-black text-primary hover:text-[#33f2ff]">
+                      View all
+                    </button>
+                  </div>
+
+                  <div id="live-games" className="space-y-3">
+                    {LIVE_GAMES.map((g) => (
+                      <LiveGameRow key={g.id} game={g} />
+                    ))}
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </main>
         </div>
       ) : null}
 

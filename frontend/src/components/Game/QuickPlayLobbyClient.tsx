@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Dashboard/Icon";
+import { Sidebar } from "@/components/Shared/Sidebar";
 import { Avatar } from "./Avatar";
 import { QUICK_PLAY_PLAYERS } from "./mock";
 
@@ -24,8 +25,9 @@ export default function QuickPlayLobbyClient() {
   const readyPlayers = QUICK_PLAY_PLAYERS.filter((p) => p.status === "ready").length;
 
   return (
-    <div className="min-h-screen bg-background text-white">
-      <div className="mx-auto w-full max-w-md lg:max-w-5xl lg:px-10 lg:py-10">
+    <Sidebar>
+      <div className="min-h-screen bg-background text-white flex flex-col">
+        <div className="flex-1 mx-auto w-full max-w-md lg:max-w-5xl lg:px-10 lg:py-10">
         <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-8">
           <div className="relative overflow-hidden lg:rounded-[32px] lg:border lg:border-white/10 lg:bg-surface/10">
             {/* Top bar */}
@@ -155,8 +157,9 @@ export default function QuickPlayLobbyClient() {
             </div>
           </aside>
         </div>
+        </div>
       </div>
-    </div>
+    </Sidebar>
   );
 }
 
