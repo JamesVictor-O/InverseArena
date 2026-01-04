@@ -1,12 +1,10 @@
-
 # 🎮 INVERSE ARENA
 
 ## The Contrarian GameFi Protocol Where Minority Wins
 
-[![Mantle Network](https://img.shields.io/badge/Built%20on-Mantle-blue)](https://mantle.xyz)
+[![Mantle Network](https://img.shields.io/badge/Built%20on-Mantle-blue)](https://mantle.xyz) [![Base](https://img.shields.io/badge/Built%20on-Base-blue)](https://base.org)
 
-
-**Inverse Arena** is a revolutionary blockchain-based elimination game where going against the crowd is the winning strategy. Players stake assets, make binary choices, and the minority survives each round. The last player standing claims the entire prize pool plus accumulated yield deployed on mantel and base.
+**Inverse Arena** is a revolutionary blockchain-based elimination game where going against the crowd is the winning strategy. Players stake assets, make binary choices, and the minority survives each round. The last player standing claims the entire prize pool plus accumulated yield deployed on mantel and base
 
 ---
 
@@ -24,7 +22,8 @@
 4. **Unsustainable Tokenomics**: Most GameFi projects collapse due to poor economic design
 5. **Limited RWA Integration**: GameFi hasn't leveraged the power of Real-World Assets and yield generation
 
-### The "Waiting Room Problem" 
+### The "Waiting Room Problem"
+
 The #1 killer of multiplayer blockchain games: **A player joins a pool expecting 10 participants, but only 2 have joined. The player leaves frustrated and never returns.**
 
 ---
@@ -34,48 +33,58 @@ The #1 killer of multiplayer blockchain games: **A player joins a pool expecting
 **Inverse Arena** solves these challenges through innovative game mechanics, intelligent matchmaking, and RWA-backed yield generation.
 
 ### Core Innovation: Contrarian Gameplay
+
 - **Minority Survives**: Each round, players choose HEAD or TAIL. The minority group advances.
 - **Strategic Depth**: Players must predict what others will choose and do the opposite
 - **Psychological Warfare**: Creates intense game theory dynamics
 
 ### Smart Matchmaking System
+
 We eliminate the waiting room problem through multiple game modes:
 
 #### 1. **Quick Play** (Instant Action)
+
 - Dynamic pool sizing (4-20 players)
 - Intelligent matchmaking algorithm
 - Average wait time: <30 seconds
 - Games auto-start when minimum threshold reached
 
 #### 2. **Scheduled Tournaments** (Guaranteed Start)
+
 - Games launch every hour at fixed times
 - Pre-registration with countdown timer
 - Larger prize pools
 - Community hype building
 
 #### 3. **Private Rooms** (Social Play)
+
 - Create custom games for friends
 - Adjustable parameters (entry fee, pool size)
 - Spectator mode enabled
 
 #### 4. **Progressive Entry**
+
 - Games start with 4 players minimum
 - Others can join during Round 1 (with slight premium)
 - Keeps momentum going
 
 ### RWA Integration & Yield Generation
+
 - Staked funds automatically deposited into Mantle's yield-generating protocols (mETH, USDT0)
 - Prize pool grows during gameplay from accumulated yield
 - Winners receive: Original stakes + Yield + Platform rewards
 
 ### Token Economics & Retention
+
 **$INVERSE Token Utility:**
+
 - Entry fee discounts (up to 30% off)
 - Access to VIP tournaments
 - Governance rights (vote on new features)
 - Staking rewards (earn while you wait)
 
 **User Retention Mechanics:**
+
 - **Daily Quests**: Complete challenges for rewards
 - **Seasonal Passes**: Battle pass style progression
 - **NFT Achievements**: Mint badges for milestones
@@ -115,6 +124,7 @@ We eliminate the waiting room problem through multiple game modes:
 ### Smart Contract Architecture
 
 #### 1. **GameManager.sol** (Core Game Logic)
+
 ```solidity
 // Key Functions:
 - createQuickPlayGame(uint256 entryFee)
@@ -127,12 +137,14 @@ We eliminate the waiting room problem through multiple game modes:
 ```
 
 **Key Features:**
+
 - Dynamic pool sizing
 - Multi-game mode support
 - Automated round processing
 - Fair elimination algorithm
 
 #### 2. **YieldVault.sol** (RWA Integration)
+
 ```solidity
 // Key Functions:
 - depositToYield(uint256 amount, address protocol)
@@ -142,11 +154,13 @@ We eliminate the waiting room problem through multiple game modes:
 ```
 
 **Integrated Protocols:**
+
 - Mantle Staked ETH (mETH)
 - USDT0 (Yield-bearing stablecoin)
 - Other Mantle DeFi protocols
 
 #### 3. **InverseToken.sol** ($INVERSE)
+
 ```solidity
 // Key Functions:
 - stake(uint256 amount)
@@ -156,6 +170,7 @@ We eliminate the waiting room problem through multiple game modes:
 ```
 
 **Token Distribution:**
+
 - 40% - Community Rewards & Incentives
 - 20% - Liquidity Provision
 - 15% - Team & Development (2-year vesting)
@@ -163,6 +178,7 @@ We eliminate the waiting room problem through multiple game modes:
 - 10% - Private Sale & Strategic Partners
 
 #### 4. **NFTAchievements.sol**
+
 ```solidity
 // Mint badges for:
 - First win
@@ -172,8 +188,8 @@ We eliminate the waiting room problem through multiple game modes:
 ```
 
 #### 5. **Matchmaking.sol**
+
 ```solidity
-// Intelligent queue system:
 - addToQueue(address player, GameMode mode)
 - matchPlayers()
 - estimateWaitTime()
@@ -182,6 +198,7 @@ We eliminate the waiting room problem through multiple game modes:
 ### Technology Stack
 
 **Frontend:**
+
 - Next.js 14 (App Router)
 - TypeScript
 - TailwindCSS + shadcn/ui
@@ -189,17 +206,20 @@ We eliminate the waiting room problem through multiple game modes:
 - React Query (State management)
 
 **Smart Contracts:**
+
 - Solidity 0.8.24
 - Hardhat (Development)
 - OpenZeppelin (Security)
 - Chainlink VRF (Randomness)
 
 **Backend/Indexing:**
+
 - The Graph (Event indexing)
 - IPFS (Metadata storage)
 - Node.js (Off-chain services)
 
 **Blockchain:**
+
 - Mantle Network (Layer 2)
 - Mantle SDK integration
 - Low gas fees for frequent transactions
@@ -234,12 +254,13 @@ We eliminate the waiting room problem through multiple game modes:
 **Initial Pool: 10 Players (10 MNT entry fee each = 100 MNT total)**
 
 | Round | Players | Choice Distribution | Outcome | Eliminated | Remaining |
-|-------|---------|---------------------|---------|------------|-----------|
+| ----- | ------- | ------------------- | ------- | ---------- | --------- |
 | 1     | 10      | HEAD: 7, TAIL: 3    | HEAD    | 7          | 3         |
 | 2     | 3       | HEAD: 2, TAIL: 1    | TAIL    | 1          | 2         |
 | 3     | 2       | HEAD: 1, TAIL: 1    | HEAD    | 1          | 1 🏆      |
 
 **Winner receives:**
+
 - 100 MNT (original stakes)
 - ~2 MNT (yield generated during 3 rounds)
 - 50 $INVERSE tokens (platform bonus)
@@ -250,56 +271,62 @@ We eliminate the waiting room problem through multiple game modes:
 ## 🚀 Key Features
 
 ### For Players
+
 ✅ **Fair & Transparent**: Provably random outcomes via Chainlink VRF  
 ✅ **No Waiting**: Multiple game modes ensure instant action  
 ✅ **Earn While Playing**: Staked funds generate yield  
 ✅ **Social Gaming**: Invite friends, spectate, chat  
 ✅ **Progression System**: Level up, unlock rewards  
-✅ **Mobile Optimized**: Play anywhere, anytime  
+✅ **Mobile Optimized**: Play anywhere, anytime
 
 ### For the Ecosystem
+
 ✅ **Built on Mantle**: Low gas, high throughput  
 ✅ **RWA Integration**: First GameFi leveraging real yield  
 ✅ **Sustainable Economics**: Deflationary token model  
 ✅ **Composable**: Open API for integrations  
-✅ **Compliant**: KYC optional for high-stakes games  
+✅ **Compliant**: KYC optional for high-stakes games
 
 ---
 
 ## 📊 Competitive Advantages
 
-| Feature | Inverse Arena | Traditional GameFi | Web2 Games |
-|---------|---------------|-------------------|------------|
-| Instant Matchmaking | ✅ <30s | ❌ 5-10 min | ✅ Yes |
-| Yield Generation | ✅ RWA-backed | ❌ No | ❌ No |
-| True Ownership | ✅ NFTs | ⚠️ Limited | ❌ No |
-| Social Features | ✅ Built-in | ⚠️ Basic | ✅ Advanced |
-| Contrarian Gameplay | ✅ Unique | ❌ No | ❌ No |
-| Sustainable Economy | ✅ Deflationary | ❌ Inflationary | N/A |
+| Feature             | Inverse Arena   | Traditional GameFi | Web2 Games  |
+| ------------------- | --------------- | ------------------ | ----------- |
+| Instant Matchmaking | ✅ <30s         | ❌ 5-10 min        | ✅ Yes      |
+| Yield Generation    | ✅ RWA-backed   | ❌ No              | ❌ No       |
+| True Ownership      | ✅ NFTs         | ⚠️ Limited         | ❌ No       |
+| Social Features     | ✅ Built-in     | ⚠️ Basic           | ✅ Advanced |
+| Contrarian Gameplay | ✅ Unique       | ❌ No              | ❌ No       |
+| Sustainable Economy | ✅ Deflationary | ❌ Inflationary    | N/A         |
 
 ---
 
 ## 🎯 Roadmap
 
 ### Phase 1: Foundation (Q1 2025) ✅
+
 - Smart contract development
 - Frontend MVP
 - Testnet deployment
 - Security audit
 
 ### Phase 2: Launch (Q2 2025)
+
 - Mainnet deployment on Mantle
 - Quick Play mode live
 - $INVERSE token launch
 - Community building
 
 ### Phase 3: Growth (Q3 2025)
+
 - Scheduled tournaments
 - Mobile app release
 - Partnership integrations
 - Marketing campaigns
 
 ### Phase 4: Scale (Q4 2025)
+
 - Advanced game modes
 - Cross-chain expansion
 - DAO governance launch
@@ -359,7 +386,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **[Your Name]** - Founder & Lead Developer  
 **[Team Member 2]** - Smart Contract Engineer  
 **[Team Member 3]** - Frontend Developer  
-**[Team Member 4]** - Product Designer  
+**[Team Member 4]** - Product Designer
 
 ---
 
@@ -368,6 +395,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Built for the [Mantle Global Hackathon 2025](https://www.hackquest.io/hackathons/Mantle-Global-Hackathon-2025)
 
 Special thanks to:
+
 - Mantle Network team
 - Chainlink for VRF integration
 - OpenZeppelin for security standards
@@ -378,6 +406,7 @@ Special thanks to:
 ## 📞 Contact
 
 For partnerships, press inquiries, or support:
+
 - Email: hello@inversearena.xyz
 - Telegram: @InverseArena
 
