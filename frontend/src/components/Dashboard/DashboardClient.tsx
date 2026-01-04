@@ -188,7 +188,7 @@ export default function DashboardClient() {
 
   const handleModeAction = (mode: LobbyMode) => {
     if (mode.id === "quick") {
-      router.push("/quick-play/lobby");
+      router.push("/dashboard/quick-play/lobby");
     }
   };
 

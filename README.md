@@ -2,7 +2,8 @@
 
 ## The Contrarian GameFi Protocol Where Minority Wins
 
-[![Mantle Network](https://img.shields.io/badge/Built%20on-Mantle-blue)](https://mantle.xyz) [![Base](https://img.shields.io/badge/Built%20on-Base-blue)](https://base.org)
+[![Mantle Network](https://img.shields.io/badge/Built%20on-Mantle-blue)](https://mantle.xyz)
+ [![Base](https://img.shields.io/badge/Built%20on-Base-blue)](https://base.org)
 
 **Inverse Arena** is a revolutionary blockchain-based elimination game where going against the crowd is the winning strategy. Players stake assets, make binary choices, and the minority survives each round. The last player standing claims the entire prize pool plus accumulated yield deployed on mantel and base
 
