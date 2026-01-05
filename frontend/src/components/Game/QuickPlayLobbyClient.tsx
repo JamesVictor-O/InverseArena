@@ -21,7 +21,9 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
 export default function QuickPlayLobbyClient() {
   const router = useRouter();
   const maxPlayers = 10;
-  const readyPlayers = QUICK_PLAY_PLAYERS.filter((p) => p.status === "ready").length;
+  const readyPlayers = QUICK_PLAY_PLAYERS.filter(
+    (p) => p.status === "ready"
+  ).length;
 
   return (
     <div className="min-h-screen bg-background text-white flex flex-col">
@@ -142,8 +144,8 @@ export default function QuickPlayLobbyClient() {
               </div>
 
               <div className="mt-6 text-sm text-white/70 leading-relaxed">
-                You’re in matchmaking. Invite friends to speed it up, or wait for
-                the lobby to fill.
+                You’re in matchmaking. Invite friends to speed it up, or wait
+                for the lobby to fill.
               </div>
 
               <button
@@ -155,8 +157,7 @@ export default function QuickPlayLobbyClient() {
             </div>
           </aside>
         </div>
-        </div>
       </div>
+    </div>
   );
 }
-

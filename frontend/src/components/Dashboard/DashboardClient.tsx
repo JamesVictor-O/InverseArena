@@ -194,10 +194,8 @@ export default function DashboardClient() {
 
   return (
     <div className="min-h-screen bg-background text-white">
-      {/* DESKTOP APP SHELL */}
       {isDesktop ? (
         <div className="min-h-screen flex flex-col">
-          {/* Desktop header */}
           <header className="h-16 px-8 flex items-center justify-between border-b border-white/5 bg-background/60 backdrop-blur-xl sticky top-0 z-20">
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-black tracking-tight">Dashboard</h1>
@@ -205,8 +203,6 @@ export default function DashboardClient() {
                 Live Round #8492 • Ends in 00:45
               </span>
             </div>
-
-            {/* Wallet Pill - Step 1 Target */}
             <div
               id="wallet-pill"
               className="flex items-center gap-2 bg-surface border border-white/10 rounded-full pl-2 pr-4 py-1.5 shadow-lg"
@@ -278,11 +274,8 @@ export default function DashboardClient() {
           </main>
         </div>
       ) : null}
-
-      {/* MOBILE LAYOUT */}
       {!isDesktop ? (
         <div className="relative h-svh w-full overflow-hidden shadow-2xl font-display">
-          {/* HEADER */}
           <header className="flex items-center justify-between px-5 pt-10 pb-4 z-10 relative">
             <div className="flex items-center gap-3">
               <div className="size-10 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(0,238,255,0.18)]">
@@ -400,8 +393,6 @@ export default function DashboardClient() {
           </nav>
         </div>
       ) : null}
-
-      {/* ONBOARDING OVERLAY (shared) */}
       {tutorialStep !== null && (
         <OnboardingOverlay
           step={ONBOARDING_STEPS[tutorialStep]}
