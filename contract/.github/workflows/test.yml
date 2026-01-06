@@ -1,0 +1,21 @@
+name: Foundry Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Install Dependencies
+        run: forge install
+      - name: Run Tests
+        run: forge test
+      - name: Generate Coverage
+        run: forge coverage
