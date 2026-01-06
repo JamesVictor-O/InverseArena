@@ -31,12 +31,14 @@ contract/
 ### Installation
 
 1. Install Foundry dependencies:
+
 ```bash
 forge install OpenZeppelin/openzeppelin-contracts
 forge install smartcontractkit/chainlink-brownie-contracts
 ```
 
 2. Install Node.js dependencies:
+
 ```bash
 pnpm install
 ```
@@ -44,6 +46,7 @@ pnpm install
 ### Configuration
 
 1. Create a `.env` file in the `contract/` directory:
+
 ```env
 PRIVATE_KEY=your_private_key_here
 VRF_COORDINATOR=0x...  # Chainlink VRF Coordinator address
@@ -58,7 +61,9 @@ BASE_API_KEY=your_base_api_key
 ## 📝 Contracts Overview
 
 ### GameManager.sol
+
 Core game logic contract that manages:
+
 - Game creation (Quick Play, Scheduled, Private)
 - Player participation
 - Round processing with Chainlink VRF
@@ -66,6 +71,7 @@ Core game logic contract that manages:
 - Prize distribution
 
 **Key Functions:**
+
 - `createQuickPlayGame()` - Create instant match game
 - `createScheduledGame()` - Create scheduled tournament
 - `createPrivateRoom()` - Create private game
@@ -73,18 +79,23 @@ Core game logic contract that manages:
 - `makeChoice()` - Make HEAD/TAIL choice for round
 
 ### YieldVault.sol
+
 Manages yield generation from staked game funds:
+
 - Deposits to yield protocols (mETH, USDT0)
 - Tracks yield accumulation per game
 - Distributes yield to winners
 
 **Key Functions:**
+
 - `depositForGame()` - Deposit funds for a game
 - `getAccumulatedYield()` - Get yield for a game
 - `distributeYield()` - Distribute yield to winner
 
 ### NFTAchievements.sol
+
 NFT collection for player achievements:
+
 - First Win
 - 10-game Streak
 - Tournament Champion
@@ -92,18 +103,22 @@ NFT collection for player achievements:
 - And more...
 
 **Key Functions:**
+
 - `mintAchievement()` - Mint achievement NFT
 - `getUserAchievements()` - Get user's achievements
 - `hasAchievementType()` - Check if user has achievement
 
 ### Matchmaking.sol
+
 Intelligent matchmaking system:
+
 - Player queue management
 - Automatic game creation when threshold reached
 - Wait time estimation
 - Entry fee matching
 
 **Key Functions:**
+
 - `addToQueue()` - Join matchmaking queue
 - `removeFromQueue()` - Leave queue
 - `matchPlayers()` - Manually trigger matching
@@ -112,16 +127,19 @@ Intelligent matchmaking system:
 ## 🧪 Testing
 
 Run tests:
+
 ```bash
 forge test
 ```
 
 Run tests with gas reporting:
+
 ```bash
 forge test --gas-report
 ```
 
 Run tests with coverage:
+
 ```bash
 forge coverage
 ```

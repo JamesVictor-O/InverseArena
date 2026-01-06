@@ -93,13 +93,6 @@ contract Matchmaking is Ownable, ReentrancyGuard {
         });
     }
 
-    // ============ External Functions ============
-
-    /**
-     * @notice Add player to matchmaking queue
-     * @param mode Preferred game mode
-     * @param entryFee Desired entry fee
-     */
     function addToQueue(
         GameManager.GameMode mode,
         uint256 entryFee
@@ -118,14 +111,8 @@ contract Matchmaking is Ownable, ReentrancyGuard {
         playerQueueMode[msg.sender] = mode;
 
         emit PlayerQueued(msg.sender, mode, entryFee);
-
-        // Try to match players
         _tryMatchPlayers(mode);
     }
-
-    /**
-     * @notice Remove player from queue
-     */
     function removeFromQueue() external nonReentrant {
         require(inQueue[msg.sender], "Not in queue");
 
@@ -174,18 +161,13 @@ contract Matchmaking is Ownable, ReentrancyGuard {
         if (queueLength >= config.autoStartThreshold) {
             return 0; // Can start immediately
         }
-
-        // Estimate based on historical data (simplified)
-        // In production, this would use actual historical matchmaking data
         uint256 playersNeeded = config.autoStartThreshold - queueLength;
         uint256 avgTimePerPlayer = 5; // 5 seconds average per player
 
         return playersNeeded * avgTimePerPlayer;
     }
 
-    /**
-     * @notice Get queue status for a game mode
-     */
+
     function getQueueStatus(
         GameManager.GameMode mode
     ) external view returns (
