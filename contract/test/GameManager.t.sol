@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {GameManager} from "../contracts/GameManager.sol";
 import {YieldVault} from "../contracts/YieldVault.sol";
-import {InverseToken} from "../contracts/InverseToken.sol";
 import {NFTAchievements} from "../contracts/NFTAchievements.sol";
 
 /**
@@ -15,7 +14,6 @@ import {NFTAchievements} from "../contracts/NFTAchievements.sol";
 contract GameManagerTest is Test {
     GameManager public gameManager;
     YieldVault public yieldVault;
-    InverseToken public inverseToken;
     NFTAchievements public nftAchievements;
 
     address public owner = address(1);
@@ -36,14 +34,12 @@ contract GameManagerTest is Test {
         vm.startPrank(owner);
 
         // Deploy contracts
-        inverseToken = new InverseToken();
         yieldVault = new YieldVault();
         nftAchievements = new NFTAchievements();
 
         // Deploy GameManager
         gameManager = new GameManager(
             address(yieldVault),
-            address(inverseToken),
             address(nftAchievements),
             VRF_COORDINATOR,
             VRF_SUBSCRIPTION_ID,
