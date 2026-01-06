@@ -9,11 +9,9 @@ contract/
 ├── contracts/
 │   ├── interfaces/          # Contract interfaces
 │   │   ├── IYieldVault.sol
-│   │   ├── IInverseToken.sol
 │   │   └── INFTAchievements.sol
 │   ├── GameManager.sol      # Core game logic
 │   ├── YieldVault.sol       # RWA yield generation
-│   ├── InverseToken.sol     # ERC20 token with staking
 │   ├── NFTAchievements.sol  # NFT achievements
 │   └── Matchmaking.sol       # Player matchmaking
 ├── script/
@@ -84,19 +82,6 @@ Manages yield generation from staked game funds:
 - `depositForGame()` - Deposit funds for a game
 - `getAccumulatedYield()` - Get yield for a game
 - `distributeYield()` - Distribute yield to winner
-
-### InverseToken.sol
-ERC20 token with additional features:
-- Staking with rewards
-- Entry fee discounts (up to 30%)
-- VIP access for large stakers
-- Governance voting (ERC20Votes)
-
-**Key Functions:**
-- `stake()` - Stake tokens to earn rewards
-- `unstake()` - Unstake tokens
-- `getEntryFeeDiscount()` - Get discount percentage
-- `hasVIPAccess()` - Check VIP status
 
 ### NFTAchievements.sol
 NFT collection for player achievements:
@@ -170,17 +155,20 @@ forge script script/Deploy.s.sol:DeployScript \
   --verify
 ```
 
+## 💰 Token Usage
+
+**Native Token (MNT)**: All game transactions use Mantle's native token (MNT). Entry fees, prizes, and yield are all denominated in MNT.
+
 ## 📋 Deployment Checklist
 
 - [ ] Set up Chainlink VRF subscription
 - [ ] Configure VRF coordinator addresses
 - [ ] Set up yield protocol addresses (mETH, USDT0)
 - [ ] Deploy contracts in order:
-  1. InverseToken
-  2. YieldVault
-  3. NFTAchievements
-  4. GameManager
-  5. Matchmaking
+  1. YieldVault
+  2. NFTAchievements
+  3. GameManager
+  4. Matchmaking
 - [ ] Set up contract authorizations
 - [ ] Configure platform fee
 - [ ] Test on testnet
