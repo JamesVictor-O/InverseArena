@@ -16,11 +16,18 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "compile": "forge build",
+    "test": "forge test",
+    "test:coverage": "forge coverage",
+    "test:gas": "forge test --gas-report",
+    "deploy:testnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url mantle_testnet --broadcast --verify",
+    "deploy:mainnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url mantle_mainnet --broadcast --verify",
+    "verify": "forge verify-contract",
+    "install": "forge install",
+    "update": "forge update"
   },
   "devDependencies": {
     "typescript": "^5.6.3"
   }
 }
-
-
