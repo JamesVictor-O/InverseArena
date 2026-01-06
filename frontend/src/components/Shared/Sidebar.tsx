@@ -72,7 +72,11 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
         <nav className="px-3 py-4 space-y-1">
           {[
             { icon: "home", label: "Lobby", path: "/dashboard" },
-            { icon: "stadia_controller", label: "Games", path: "/dashboard/games" },
+            {
+              icon: "stadia_controller",
+              label: "Games",
+              path: "/dashboard/games",
+            },
             { icon: "leaderboard", label: "Rank", path: "/rank" },
             { icon: "person", label: "Profile", path: "/dashboard/profile" },
             { icon: "settings", label: "Settings", path: "/settings" },

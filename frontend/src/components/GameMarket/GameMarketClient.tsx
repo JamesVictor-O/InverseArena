@@ -246,7 +246,7 @@ function FeaturedGameCard({ game }: { game: Game }) {
         <div className="flex items-center gap-3">
           <button className="flex-1 lg:flex-none px-6 lg:px-8 h-12 lg:h-14 rounded-2xl bg-primary text-background font-black text-base lg:text-lg tracking-wide hover:bg-primary-hover transition-colors shadow-[0_0_30px_rgba(0,238,255,0.3)] flex items-center justify-center gap-2">
             Join Now
-            <Icon name="arrow_forward" className="text-background" />
+            <Icon name="arrow_forward" className="text-background text-lg" />
           </button>
         </div>
       </div>
