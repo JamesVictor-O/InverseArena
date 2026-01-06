@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
 import "./interfaces/IYieldVault.sol";
-import "./interfaces/IInverseToken.sol";
 import "./interfaces/INFTAchievements.sol";
 
 /**
@@ -17,8 +16,6 @@ import "./interfaces/INFTAchievements.sol";
  */
 contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     using Counters for Counters.Counter;
-
-    // ============ Enums ============
     
     enum GameMode {
         QuickPlay,
@@ -37,8 +34,6 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         Head,
         Tail
     }
-
-    // ============ Structs ============
 
     struct Game {
         uint256 gameId;
@@ -76,12 +71,10 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         uint256 roundEliminated;
     }
 
-    // ============ State Variables ============
 
     Counters.Counter private _gameIdCounter;
     
     IYieldVault public yieldVault;
-    IInverseToken public inverseToken;
     INFTAchievements public nftAchievements;
     VRFCoordinatorV2Interface public vrfCoordinator;
 
@@ -162,14 +155,12 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
     constructor(
         address _yieldVault,
-        address _inverseToken,
         address _nftAchievements,
         address _vrfCoordinator,
         uint64 _vrfSubscriptionId,
         bytes32 _vrfKeyHash
     ) VRFConsumerBaseV2(_vrfCoordinator) Ownable(msg.sender) {
         yieldVault = IYieldVault(_yieldVault);
-        inverseToken = IInverseToken(_inverseToken);
         nftAchievements = INFTAchievements(_nftAchievements);
         vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
         vrfSubscriptionId = _vrfSubscriptionId;
@@ -204,15 +195,6 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         game.startTime = block.timestamp;
         game.creator = msg.sender;
         game.totalPrizePool = entryFee;
-
-        // Apply discount if user has staked tokens
-        uint256 discount = inverseToken.getEntryFeeDiscount(msg.sender);
-        if (discount > 0) {
-            uint256 discountAmount = (entryFee * discount) / 100;
-            game.totalPrizePool -= discountAmount;
-            // Refund discount amount
-            payable(msg.sender).transfer(discountAmount);
-        }
 
         // Add creator as first player
         game.players[msg.sender] = true;
@@ -264,14 +246,6 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         game.creator = msg.sender;
         game.totalPrizePool = entryFee;
 
-        // Apply discount
-        uint256 discount = inverseToken.getEntryFeeDiscount(msg.sender);
-        if (discount > 0) {
-            uint256 discountAmount = (entryFee * discount) / 100;
-            game.totalPrizePool -= discountAmount;
-            payable(msg.sender).transfer(discountAmount);
-        }
-
         game.players[msg.sender] = true;
         game.playerList.push(msg.sender);
         playerGames[msg.sender].push(gameId);
@@ -310,13 +284,6 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         game.startTime = block.timestamp;
         game.creator = msg.sender;
         game.totalPrizePool = entryFee;
-
-        uint256 discount = inverseToken.getEntryFeeDiscount(msg.sender);
-        if (discount > 0) {
-            uint256 discountAmount = (entryFee * discount) / 100;
-            game.totalPrizePool -= discountAmount;
-            payable(msg.sender).transfer(discountAmount);
-        }
 
         game.players[msg.sender] = true;
         game.playerList.push(msg.sender);
@@ -357,14 +324,6 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         }
 
         require(msg.value >= requiredFee, "Insufficient payment");
-
-        // Apply discount
-        uint256 discount = inverseToken.getEntryFeeDiscount(msg.sender);
-        if (discount > 0) {
-            uint256 discountAmount = (requiredFee * discount) / 100;
-            requiredFee -= discountAmount;
-            payable(msg.sender).transfer(discountAmount);
-        }
 
         game.players[msg.sender] = true;
         game.playerList.push(msg.sender);
@@ -656,11 +615,9 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
      */
     function updateContracts(
         address _yieldVault,
-        address _inverseToken,
         address _nftAchievements
     ) external onlyOwner {
         yieldVault = IYieldVault(_yieldVault);
-        inverseToken = IInverseToken(_inverseToken);
         nftAchievements = INFTAchievements(_nftAchievements);
     }
 
