@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./GameManager.sol";
 
 /**
@@ -68,7 +68,7 @@ contract Matchmaking is Ownable, ReentrancyGuard {
     // ============ Constructor ============
 
     constructor(address _gameManager) Ownable(msg.sender) {
-        gameManager = GameManager(_gameManager);
+        gameManager = GameManager(payable(_gameManager));
 
         // Initialize default configs
         configs[GameManager.GameMode.QuickPlay] = MatchmakingConfig({
@@ -254,30 +254,22 @@ contract Matchmaking is Ownable, ReentrancyGuard {
             }
         }
 
-        // If we have enough players, create game
         if (matchedCount >= config.minPlayers) {
-            // Use median entry fee
             uint256 medianEntryFee = _calculateMedian(entryFees, matchedCount);
-
-            // Create game based on mode
             uint256 gameId;
             if (mode == GameManager.GameMode.QuickPlay) {
                 gameId = gameManager.createQuickPlayGame{value: 0}(medianEntryFee, matchedCount);
             } else if (mode == GameManager.GameMode.Scheduled) {
-                uint256 startTime = block.timestamp + config.maxWaitTime;
-                gameId = gameManager.createScheduledGame{value: 0}(startTime, medianEntryFee, matchedCount);
+                gameId = gameManager.createPrivateRoom(GameManager.Currency.MNT, medianEntryFee, matchedCount);
             } else {
-                gameId = gameManager.createPrivateRoom{value: 0}(medianEntryFee, matchedCount);
+                gameId = gameManager.createPrivateRoom(GameManager.Currency.MNT, medianEntryFee, matchedCount);
             }
 
-            // Remove matched players from queue and join game
             address[] memory playersToRemove = new address[](matchedCount);
             for (uint256 i = 0; i < matchedCount; i++) {
                 playersToRemove[i] = matchedPlayers[i];
                 inQueue[matchedPlayers[i]] = false;
                 delete playerQueueMode[matchedPlayers[i]];
-
-                // Join game with their entry fee
                 gameManager.joinGame{value: entryFees[i]}(gameId);
             }
 
@@ -308,8 +300,6 @@ contract Matchmaking is Ownable, ReentrancyGuard {
         uint256[] memory values,
         uint256 length
     ) internal pure returns (uint256) {
-        // Simplified: use average for gas efficiency
-        // In production, could implement proper median calculation
         uint256 sum = 0;
         for (uint256 i = 0; i < length; i++) {
             sum += values[i];
@@ -317,11 +307,7 @@ contract Matchmaking is Ownable, ReentrancyGuard {
         return sum / length;
     }
 
-    // ============ Admin Functions ============
-
-    /**
-     * @notice Update matchmaking config for a game mode
-     */
+ 
     function updateConfig(
         GameManager.GameMode mode,
         MatchmakingConfig memory config
@@ -338,7 +324,7 @@ contract Matchmaking is Ownable, ReentrancyGuard {
      * @notice Update game manager address
      */
     function setGameManager(address _gameManager) external onlyOwner {
-        gameManager = GameManager(_gameManager);
+        gameManager = GameManager(payable(_gameManager));
     }
 
     /**
