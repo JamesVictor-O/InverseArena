@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Sidebar } from "@/components/Shared/Sidebar";
 import { DashboardHeader } from "@/components/Shared/DashboardHeader";
+import { FloatingCreateButton } from "@/components/Shared/FloatingCreateButton";
 import { CreateArenaModal } from "@/components/Dashboard/CreateArenaModal";
 
 export default function DashboardLayout({
@@ -29,6 +30,7 @@ export default function DashboardLayout({
         <DashboardHeader />
         {children}
       </Sidebar>
+      <FloatingCreateButton onClick={() => setCreateModalOpen(true)} />
       <CreateArenaModal
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
