@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 import "./interfaces/INFTAchievements.sol";
 
 /**
@@ -13,15 +12,13 @@ import "./interfaces/INFTAchievements.sol";
  * @dev Mints achievement badges for milestones like first win, streaks, etc.
  */
 contract NFTAchievements is ERC721URIStorage, Ownable, INFTAchievements {
-    using Counters for Counters.Counter;
-
     // ============ Enums ============
 
     enum AchievementType {
-        FirstWin,           // 0
-        TenGameStreak,      // 1
-        TournamentChampion, // 2
-        LoyaltyBronze,      // 3
+        FirstWin,           
+        TenGameStreak,     
+        TournamentChampion, 
+        LoyaltyBronze,      
         LoyaltySilver,      // 4
         LoyaltyGold,        // 5
         LoyaltyPlatinum,    // 6
@@ -42,11 +39,11 @@ contract NFTAchievements is ERC721URIStorage, Ownable, INFTAchievements {
 
     // ============ State Variables ============
 
-    Counters.Counter private _tokenIdCounter;
+    uint256 private _tokenIdCounter;
 
     mapping(uint256 => Achievement) public achievements;
     mapping(address => uint256[]) public userAchievements;
-    mapping(address => mapping(AchievementType => bool)) public hasAchievement;
+    mapping(address => mapping(AchievementType => bool)) private _hasAchievement;
     mapping(address => uint256) public userAchievementCount;
 
     string public baseURI = "https://api.inversearena.xyz/achievements/";
@@ -123,12 +120,14 @@ contract NFTAchievements is ERC721URIStorage, Ownable, INFTAchievements {
         bool canMintMultiple = aType == AchievementType.TournamentChampion || 
                               aType == AchievementType.YieldEarner;
         
-        if (!canMintMultiple && hasAchievement[to][aType]) {
+        if (!canMintMultiple && _hasAchievement[to][aType]) {
             revert("Achievement already earned");
         }
 
-        uint256 tokenId = _tokenIdCounter.current();
-        _tokenIdCounter.increment();
+        uint256 tokenId = _tokenIdCounter;
+        unchecked {
+            ++_tokenIdCounter;
+        }
 
         // Mint NFT
         _safeMint(to, tokenId);
@@ -144,7 +143,7 @@ contract NFTAchievements is ERC721URIStorage, Ownable, INFTAchievements {
 
         // Update user mappings
         userAchievements[to].push(tokenId);
-        hasAchievement[to][aType] = true;
+        _hasAchievement[to][aType] = true;
         userAchievementCount[to]++;
 
         // Set token URI
@@ -157,14 +156,14 @@ contract NFTAchievements is ERC721URIStorage, Ownable, INFTAchievements {
      * @notice Check if user has a specific achievement
      * @param user User address
      * @param achievementType Achievement type
-     * @return hasAchievement_ True if user has the achievement
+     * @return hasAchievement True if user has the achievement
      */
-    function hasAchievementType(
+    function hasAchievement(
         address user,
         uint8 achievementType
-    ) external view returns (bool hasAchievement_) {
+    ) external view override returns (bool) {
         require(achievementType <= uint8(AchievementType.ContrarianMaster), "Invalid achievement type");
-        return hasAchievement[user][AchievementType(achievementType)];
+        return _hasAchievement[user][AchievementType(achievementType)];
     }
 
     /**
