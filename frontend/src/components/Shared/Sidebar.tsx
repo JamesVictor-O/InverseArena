@@ -60,7 +60,7 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
 
   if (!isDesktop) {
     return (
-      <div className="relative min-h-screen pb-20">
+      <div className="relative min-h-screen pt-24 pb-20">
         {children}
         {/* Mobile Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-[#0a1516]/90 backdrop-blur-xl border-t border-white/5 px-6 py-3 flex justify-between items-end z-50 pb-6">

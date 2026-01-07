@@ -68,9 +68,9 @@ export function DashboardHeader() {
     );
   }
 
-  // Mobile header
+  // Mobile header - fixed at top
   return (
-    <header className="flex items-center justify-between px-5 pt-10 pb-4 z-10 relative">
+    <header className="fixed top-0 left-0 right-0 flex items-center justify-between px-5 pt-10 pb-4 z-40 bg-background/80 backdrop-blur-xl border-b border-white/5">
       <div className="flex items-center gap-3">
         <div className="size-10 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(0,238,255,0.18)]">
           <Icon name="stadia_controller" className="text-[20px]" />
