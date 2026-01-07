@@ -88,7 +88,7 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
               <div className="flex items-center justify-center size-6 rounded-full bg-primary/20 text-primary">
                 <Icon name="account_balance_wallet" className="text-[16px]" />
               </div>
-              <span className="text-sm font-bold tracking-wide text-white">0.42 ETH</span>
+              <span className="text-sm font-bold tracking-wide text-white">0.42 USDT0</span>
             </div>
           </header>
 
@@ -98,7 +98,7 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
                 <div className="text-[10px] uppercase tracking-[0.25em] text-white/50 font-black">
                   Prize pool
                 </div>
-                <div className="text-3xl font-black mt-1">15.5 ETH</div>
+                <div className="text-3xl font-black mt-1">15.5 USDT0</div>
               </div>
               <div className="rounded-3xl border border-white/10 bg-surface/20 p-4 text-right">
                 <div className="text-[10px] uppercase tracking-[0.25em] text-white/50 font-black">

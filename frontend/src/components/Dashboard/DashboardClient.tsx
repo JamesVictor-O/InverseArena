@@ -211,12 +211,6 @@ export default function DashboardClient() {
                     Choose Your Mode
                   </h2>
                 </div>
-                <button
-                  className="text-xs text-white/60 hover:text-white"
-                  onClick={() => setTutorialStep(0)}
-                >
-                  Restart onboarding
-                </button>
               </div>
 
               <div className="grid grid-cols-12 gap-6">

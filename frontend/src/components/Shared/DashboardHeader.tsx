@@ -42,7 +42,8 @@ export function DashboardHeader() {
   const { title, subtitle } = getPageTitle(pathname);
   
   // Mock balance - replace with real data later
-  const balance = walletAddress ? "$2,450.00" : "0.00";
+  // TODO: Fetch actual USDT0/MNT balance from contract
+  const balance = walletAddress ? "2,450.00 USDT0" : "0.00 USDT0";
 
   if (isDesktop) {
     return (

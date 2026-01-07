@@ -3,12 +3,14 @@
 import * as React from "react";
 import { X, Pencil, Wallet, Users, Lock, FileText, Fuel } from "lucide-react";
 import { Icon } from "./Icon";
+import { Currency, CURRENCY_INFO, MIN_ENTRY_FEE, MAX_ENTRY_FEE } from "@/lib/contract-types";
 
 interface CreateArenaModalProps {
   open: boolean;
   onClose: () => void;
   onCreate: (data: {
     name?: string;
+    currency: Currency;
     entryFee: number;
     maxPlayers: number;
     isPrivate: boolean;
@@ -22,14 +24,19 @@ export function CreateArenaModal({
   onCreate,
 }: CreateArenaModalProps) {
   const [arenaName, setArenaName] = React.useState("");
-  const [entryFee, setEntryFee] = React.useState(250);
+  const [currency, setCurrency] = React.useState<Currency>(Currency.USDT0);
+  const [entryFee, setEntryFee] = React.useState(10);
   const [maxPlayers, setMaxPlayers] = React.useState(8);
   const [isPrivate, setIsPrivate] = React.useState(false);
   const [additionalRules, setAdditionalRules] = React.useState("");
 
+  const currencyInfo = CURRENCY_INFO[currency];
+  const entryFeePercent = ((entryFee - MIN_ENTRY_FEE) / (MAX_ENTRY_FEE - MIN_ENTRY_FEE)) * 100;
+
   const handleCreate = () => {
     onCreate({
       name: arenaName || undefined,
+      currency,
       entryFee,
       maxPlayers,
       isPrivate,
@@ -37,7 +44,8 @@ export function CreateArenaModal({
     });
     // Reset form
     setArenaName("");
-    setEntryFee(250);
+    setCurrency(Currency.USDT0);
+    setEntryFee(10);
     setMaxPlayers(8);
     setIsPrivate(false);
     setAdditionalRules("");
@@ -93,6 +101,35 @@ export function CreateArenaModal({
             </div>
           </div>
 
+          {/* Currency Selection */}
+          <div>
+            <label className="block text-sm font-bold text-white/70 mb-2">
+              Currency
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: Currency.USDT0, label: "USDT0", apy: "5% APY" },
+                { value: Currency.METH, label: "mETH", apy: "4% APY" },
+                { value: Currency.MNT, label: "MNT", apy: "No yield" },
+              ].map((curr) => (
+                <button
+                  key={curr.value}
+                  onClick={() => setCurrency(curr.value)}
+                  className={`h-14 rounded-xl border-2 transition-all ${
+                    currency === curr.value
+                      ? "bg-primary/20 border-primary text-primary shadow-[0_0_20px_rgba(0,238,255,0.3)]"
+                      : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <div className="font-black text-sm">{curr.label}</div>
+                  <div className="text-[10px] font-bold text-white/50 mt-0.5">
+                    {curr.apy}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Entry Fee */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -103,31 +140,32 @@ export function CreateArenaModal({
                 </label>
               </div>
               <span className="text-lg font-black text-primary">
-                {entryFee} MNT
+                {entryFee} {currencyInfo.symbol}
               </span>
             </div>
             <div className="space-y-2">
               <input
                 type="range"
-                min="10"
-                max="1000"
-                step="10"
+                min={MIN_ENTRY_FEE}
+                max={MAX_ENTRY_FEE}
+                step="0.1"
                 value={entryFee}
                 onChange={(e) => setEntryFee(Number(e.target.value))}
                 className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
                 style={{
-                  background: `linear-gradient(to right, #00eeff 0%, #00eeff ${
-                    ((entryFee - 10) / (1000 - 10)) * 100
-                  }%, rgba(255,255,255,0.1) ${
-                    ((entryFee - 10) / (1000 - 10)) * 100
-                  }%, rgba(255,255,255,0.1) 100%)`,
+                  background: `linear-gradient(to right, #00eeff 0%, #00eeff ${entryFeePercent}%, rgba(255,255,255,0.1) ${entryFeePercent}%, rgba(255,255,255,0.1) 100%)`,
                 }}
               />
               <div className="flex items-center justify-between text-xs text-white/50 font-bold">
-                <span>10 MNT</span>
-                <span>1000 MNT</span>
+                <span>{MIN_ENTRY_FEE} {currencyInfo.symbol}</span>
+                <span>{MAX_ENTRY_FEE} {currencyInfo.symbol}</span>
               </div>
             </div>
+            {currencyInfo.apy > 0 && (
+              <p className="mt-2 text-xs text-primary font-bold">
+                💰 Yield: {currencyInfo.apy}% APY during gameplay
+              </p>
+            )}
           </div>
 
           {/* Max Players */}
@@ -219,6 +257,13 @@ export function CreateArenaModal({
             <Fuel className="w-3 h-3" />
             <span className="font-bold">Est. Gas: 0.002 MNT</span>
           </div>
+          {currencyInfo.apy > 0 && (
+            <div className="mt-2 p-3 rounded-xl bg-primary/10 border border-primary/20">
+              <p className="text-xs text-primary font-bold text-center">
+                ⚡ Stakes generate {currencyInfo.apy}% APY from {currencyInfo.protocolName}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

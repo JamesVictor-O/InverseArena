@@ -15,13 +15,18 @@ export default function DashboardLayout({
 
   const handleCreateArena = (data: {
     name?: string;
+    currency: number;
     entryFee: number;
     maxPlayers: number;
     isPrivate: boolean;
     additionalRules?: string;
   }) => {
     console.log("Create arena:", data);
-    // TODO: Implement arena creation logic
+    // TODO: Call contract function based on currency:
+    // - Currency.USDT0: createQuickPlayGameUSDT0(entryFee, maxPlayers)
+    // - Currency.METH: createQuickPlayGameMETH(entryFee, maxPlayers)
+    // - Currency.MNT: createQuickPlayGame(entryFee, maxPlayers)
+    // - If isPrivate: createPrivateRoom(currency, entryFee, maxPlayers)
   };
 
   return (
