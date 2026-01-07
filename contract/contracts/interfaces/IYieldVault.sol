@@ -1,21 +1,35 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+/**
+ * @title IYieldVault
+ * @notice Interface for RWA yield generation vault supporting multiple currencies
+ * @dev Supports USDT0, mETH, and native MNT with multiple yield protocols
+ */
 interface IYieldVault {
     /**
-     * @notice Deposit funds into yield-generating protocol
-     * @param amount Amount to deposit
-     * @param protocol Protocol identifier (0 = mETH, 1 = USDT0, etc.)
-     * @return shares Amount of shares received
+     * @notice Deposit USDT0 into yield vault
+     * @param gameId Associated game ID
+     * @param amount Amount of USDT0 to deposit
+     * @return shares Shares received
      */
-    function depositToYield(uint256 amount, uint8 protocol) external returns (uint256 shares);
+    function depositUSDT0(uint256 gameId, uint256 amount) external returns (uint256 shares);
 
     /**
-     * @notice Withdraw funds from yield protocol
-     * @param shares Amount of shares to withdraw
-     * @return amount Amount of tokens received
+     * @notice Deposit mETH for Ethereum staking yield
+     * @param gameId Associated game ID
+     * @param amount Amount of mETH to deposit
+     * @return shares Shares received
      */
-    function withdrawFromYield(uint256 shares) external returns (uint256 amount);
+    function depositMETH(uint256 gameId, uint256 amount) external returns (uint256 shares);
+
+    /**
+     * @notice Deposit native MNT (legacy support)
+     * @param amount Amount to deposit
+     * @param protocol Protocol identifier (0 = mETH, 1 = USDT0, etc.)
+     * @return shares Shares received
+     */
+    function depositToYield(uint256 amount, uint8 protocol) external payable returns (uint256 shares);
 
     /**
      * @notice Get accumulated yield for a game
@@ -30,6 +44,12 @@ interface IYieldVault {
      * @param winner Winner address
      */
     function distributeYield(uint256 gameId, address winner) external;
+
+    /**
+     * @notice Emit yield snapshot for a game (for tracking/analytics)
+     * @param gameId Game ID
+     */
+    function emitYieldSnapshot(uint256 gameId) external;
 
     /**
      * @notice Get total value locked in yield protocols
