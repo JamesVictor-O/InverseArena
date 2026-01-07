@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, Bell, Bookmark } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { Icon } from "@/components/Dashboard/Icon";
 import type { Game, FilterType } from "./types";
 
@@ -257,7 +257,6 @@ function FeaturedGameCard({ game }: { game: Game }) {
 export default function GameMarketClient() {
   const isDesktop = useIsDesktop();
   const [activeFilter, setActiveFilter] = React.useState<FilterType>("all");
-  const [balance] = React.useState("2.45");
 
   const featuredGame = MOCK_GAMES.find((g) => g.featured);
   const trendingGames = MOCK_GAMES.filter((g) => !g.featured);
@@ -271,62 +270,6 @@ export default function GameMarketClient() {
 
   return (
     <div className="min-h-screen bg-background text-white">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6">
-          <div className="flex items-center justify-between gap-4">
-            {/* Left: Balance */}
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-full bg-gradient-to-br from-primary to-blue-600 border-2 border-primary/30 overflow-hidden">
-                  <div className="w-full h-full bg-background/20 flex items-center justify-center">
-                    <Icon name="person" className="text-white" />
-                  </div>
-                </div>
-                <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-green-500 border-2 border-background" />
-              </div>
-              <div className="hidden lg:block">
-                <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                  BALANCE
-                </div>
-                <div className="text-lg lg:text-xl font-black tracking-tight">
-                  {balance} ETH
-                </div>
-              </div>
-            </div>
-
-            {/* Center: Title */}
-            <div className="flex-1 text-center">
-              <h1 className="text-2xl lg:text-4xl font-black tracking-tight">
-                GAME{" "}
-                <span className="text-transparent bg-clip-text bg-linear-to-r from-primary via-accent to-secondary text-glow">
-                  MARKET
-                </span>
-              </h1>
-            </div>
-
-            {/* Right: Search & Notifications */}
-            <div className="flex items-center gap-3">
-              <button className="p-2 lg:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <Search className="w-5 h-5 lg:w-6 lg:h-6 text-white/70" />
-              </button>
-              <button className="relative p-2 lg:p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <Bell className="w-5 h-5 lg:w-6 lg:h-6 text-white/70" />
-                <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Balance */}
-          <div className="lg:hidden mt-3 text-center">
-            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-              BALANCE
-            </div>
-            <div className="text-lg font-black tracking-tight">{balance} ETH</div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 lg:px-8 py-6 lg:py-8">
         {/* Filters */}

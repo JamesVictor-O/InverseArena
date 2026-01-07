@@ -3,8 +3,6 @@
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
-  ArrowLeft,
-  Settings,
   Edit,
   Copy,
   Trophy,
@@ -174,24 +172,6 @@ export function ProfileClient() {
 
   return (
     <div className="min-h-screen bg-background text-white flex flex-col">
-      {/* Header - Mobile optimized, desktop responsive */}
-      <header className="sticky top-0 z-40 border-b border-white/5 bg-background/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
-          <button
-            onClick={() => router.back()}
-            className="p-2 text-gray-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-base lg:text-lg font-black uppercase tracking-wider">
-            PLAYER PROFILE
-          </h1>
-          <button className="p-2 text-gray-400 hover:text-white transition-colors">
-            <Settings className="w-5 h-5" />
-          </button>
-        </div>
-      </header>
-
       <main className="flex-1 max-w-7xl mx-auto px-4 lg:px-8 py-6 lg:py-8 pb-24 lg:pb-8 w-full">
         {/* Desktop: 2-column layout, Mobile: single column */}
         <div className="lg:grid lg:grid-cols-12 lg:gap-8">
