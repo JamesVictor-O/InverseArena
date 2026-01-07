@@ -12,13 +12,23 @@ const NAV = [
 
 export const Navbar: React.FC = () => {
   const [connectOpen, setConnectOpen] = useState(false);
-  const { connectWallet, isAuthenticated, walletAddress } = useConnectActions();
+  const { connectWallet, disconnect, isAuthenticated, walletAddress } = useConnectActions();
 
   const label = walletAddress
     ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
     : isAuthenticated
     ? "Connected"
     : "Connect";
+
+  const handleButtonClick = () => {
+    if (isAuthenticated) {
+      // If already connected, disconnect
+      disconnect();
+    } else {
+      // If not connected, open connect modal
+      setConnectOpen(true);
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
@@ -58,7 +68,7 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             className="hidden sm:inline-flex items-center gap-2 px-4 h-10 rounded-xl border border-white/10 bg-surface/30 hover:bg-surface/50 transition-colors text-sm font-black text-gray-200 disabled:opacity-60 disabled:hover:bg-surface/30"
-            onClick={() => setConnectOpen(true)}
+            onClick={handleButtonClick}
           >
             {label}
             <span

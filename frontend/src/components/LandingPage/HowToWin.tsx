@@ -3,16 +3,16 @@ import React from "react";
 const STEPS = [
   {
     title: "Join a lobby",
-    body: "Pick an arena that matches your risk appetite—fast, popular, or filling."
+    body: "Pick an arena that matches your risk appetite—fast, popular, or filling.",
   },
   {
     title: "Choose a side",
-    body: "Make a prediction. You don’t want to be the majority—minority survives."
+    body: "Make a prediction. You don’t want to be the majority—minority survives.",
   },
   {
     title: "Survive eliminations",
-    body: "Each round eliminates the majority. Stay in the minority to win the pot."
-  }
+    body: "Each round eliminates the majority. Stay in the minority to win the pot.",
+  },
 ];
 
 export const HowToWin: React.FC = () => {
@@ -89,4 +89,3 @@ export const HowToWin: React.FC = () => {
     </section>
   );
 };
-

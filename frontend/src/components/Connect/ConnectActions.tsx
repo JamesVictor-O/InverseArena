@@ -5,6 +5,7 @@ import { usePrivy } from "@privy-io/react-auth";
 
 type ConnectActions = {
   connectWallet: () => boolean | Promise<boolean>;
+  disconnect: () => void | Promise<void>;
   isReady: boolean;
   isAuthenticated: boolean;
   walletAddress: string | null;
@@ -28,6 +29,7 @@ function EnabledPrivyActionsProvider({
     user?: unknown;
     login?: () => unknown;
     linkWallet?: () => unknown;
+    logout?: () => unknown;
     link?: unknown;
   };
 
@@ -95,6 +97,22 @@ function EnabledPrivyActionsProvider({
           return false;
         }
       },
+      disconnect: () => {
+        if (!privy.ready) {
+          console.warn("[connect] Privy not ready yet (still initializing).");
+          return;
+        }
+
+        try {
+          if (typeof privy.logout === "function") {
+            void privy.logout();
+          } else {
+            console.warn("[connect] No logout function found on usePrivy()");
+          }
+        } catch (e) {
+          console.error("[connect] Privy logout failed:", e);
+        }
+      },
       isReady,
       isAuthenticated,
       walletAddress,
@@ -127,6 +145,11 @@ export function ConnectActionsProvider({
         "[connect] Privy is disabled. Set NEXT_PUBLIC_ENABLE_PRIVY=true and configure NEXT_PUBLIC_PRIVY_APP_ID to enable wallet connect."
       );
       return false;
+    },
+    disconnect: () => {
+      console.warn(
+        "[connect] Privy is disabled. Cannot disconnect."
+      );
     },
     isReady: false,
     isAuthenticated: false,

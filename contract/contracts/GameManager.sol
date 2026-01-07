@@ -405,7 +405,7 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
             entryAmount: requiredFee
         });
 
-        // Deposit to yield vault
+ 
         _depositToYieldVault(gameId, game.currency, requiredFee);
 
         emit PlayerJoined(gameId, msg.sender, requiredFee, game.currency);
@@ -437,7 +437,7 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
         emit ChoiceMade(gameId, msg.sender, game.currentRound, choice);
 
-        // Check if all active players have chosen
+    
         if (_allPlayersChosen(gameId)) {
             _requestVRF(gameId);
         }

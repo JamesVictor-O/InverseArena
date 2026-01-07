@@ -8,12 +8,6 @@ export const LobbyGrid: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <div className="flex items-end justify-between gap-6 mb-10">
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-              <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">
-                Lobbies
-              </span>
-            </div>
             <h2 className="text-3xl md:text-4xl font-black tracking-tight">
               Choose your arena.
             </h2>
