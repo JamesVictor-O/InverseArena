@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {YieldVault} from "../contracts/YieldVault.sol";
@@ -21,8 +21,14 @@ contract DeployScript is Script {
         console.log("Using native token (MNT) for all transactions");
 
         // 1. Deploy YieldVault
+        // Note: Update these addresses based on your Mantle network setup
+        address usdt0 = vm.envOr("USDT0_ADDRESS", address(0x1234567890123456789012345678901234567890)); // Placeholder
+        address mETH = vm.envOr("METH_ADDRESS", address(0x2345678901234567890123456789012345678901)); // Placeholder
+        address aavePool = vm.envOr("AAVE_POOL_ADDRESS", address(0x3456789012345678901234567890123456789012)); // Placeholder
+        address mnt = address(0); // Native MNT
+        
         console.log("\n1. Deploying YieldVault...");
-        YieldVault yieldVault = new YieldVault();
+        YieldVault yieldVault = new YieldVault(usdt0, mETH, aavePool, mnt);
         console.log("YieldVault deployed at:", address(yieldVault));
 
         // 2. Deploy NFTAchievements
@@ -42,7 +48,9 @@ contract DeployScript is Script {
             address(nftAchievements),
             vrfCoordinator,
             vrfSubscriptionId,
-            vrfKeyHash
+            vrfKeyHash,
+            usdt0,
+            mETH
         );
         console.log("GameManager deployed at:", address(gameManager));
 

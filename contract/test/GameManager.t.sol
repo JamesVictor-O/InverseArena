@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
 import {GameManager} from "../contracts/GameManager.sol";
@@ -33,8 +33,14 @@ contract GameManagerTest is Test {
     function setUp() public {
         vm.startPrank(owner);
 
+        // Mock addresses for YieldVault constructor
+        address usdt0 = address(0x1111111111111111111111111111111111111111);
+        address mETH = address(0x2222222222222222222222222222222222222222);
+        address aavePool = address(0x3333333333333333333333333333333333333333);
+        address mnt = address(0); // Native MNT
+
         // Deploy contracts
-        yieldVault = new YieldVault();
+        yieldVault = new YieldVault(usdt0, mETH, aavePool, mnt);
         nftAchievements = new NFTAchievements();
 
         // Deploy GameManager
@@ -43,7 +49,9 @@ contract GameManagerTest is Test {
             address(nftAchievements),
             VRF_COORDINATOR,
             VRF_SUBSCRIPTION_ID,
-            VRF_KEY_HASH
+            VRF_KEY_HASH,
+            usdt0,
+            mETH
         );
 
         vm.stopPrank();
