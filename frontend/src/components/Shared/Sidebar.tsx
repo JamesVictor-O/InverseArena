@@ -18,7 +18,13 @@ function useIsDesktop() {
   return isDesktop;
 }
 
-export function Sidebar({ children }: { children: React.ReactNode }) {
+export function Sidebar({
+  children,
+  onCreateClick,
+}: {
+  children: React.ReactNode;
+  onCreateClick?: () => void;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const isDesktop = useIsDesktop();
@@ -39,6 +45,9 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
         break;
       case "Settings":
         router.push("/settings");
+        break;
+      case "Create":
+        onCreateClick?.();
         break;
       case "Quick Play":
         router.push("/dashboard/quick-play/lobby");
@@ -86,18 +95,21 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
                 : "text-white/45 hover:text-white/70"
             }`}
           >
-            <Icon name="stadia_controller" fill={isActive("/dashboard/games")} />
+            <Icon
+              name="stadia_controller"
+              fill={isActive("/dashboard/games")}
+            />
             <span className="text-[10px] font-black tracking-wide uppercase">
               Games
             </span>
           </button>
 
           <button
-            onClick={() => handleNavClick("Quick Play")}
+            onClick={() => handleNavClick("Create")}
             className="relative -mt-4"
           >
             <div className="size-14 rounded-full bg-primary text-background shadow-[0_0_30px_rgba(0,238,255,0.35)] flex items-center justify-center border border-primary/30">
-              <Icon name="play_arrow" fill className="text-[28px]" />
+              <Icon name="add_circle" fill className="text-[28px]" />
             </div>
           </button>
 
