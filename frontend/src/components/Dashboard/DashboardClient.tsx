@@ -255,11 +255,11 @@ export default function DashboardClient() {
         </div>
       ) : null}
       {!isDesktop ? (
-        <div className="relative h-svh w-full overflow-hidden shadow-2xl font-display">
+        <div className="relative min-h-screen w-full overflow-hidden shadow-2xl font-display">
           {/* MAIN CONTENT */}
           <main
             id="dashboard-scroll"
-            className={`${styles.scrollContainer} flex-1 overflow-y-auto px-5 pb-28`}
+            className={`${styles.scrollContainer} flex-1 overflow-y-auto px-5 pb-20`}
           >
             <div className="mt-2">
               <div className="text-xs font-black tracking-[0.25em] text-primary/80 uppercase">
@@ -296,43 +296,6 @@ export default function DashboardClient() {
               </div>
             </div>
           </main>
-
-          {/* BOTTOM NAV */}
-          <nav className="absolute bottom-0 w-full bg-[#0a1516]/90 backdrop-blur-xl border-t border-white/5 px-6 py-3 flex justify-between items-end z-10 pb-6">
-            <button className="flex flex-col items-center gap-1 text-primary">
-              <Icon name="home" fill />
-              <span className="text-[10px] font-black tracking-wide uppercase">
-                Lobby
-              </span>
-            </button>
-
-            <button className="flex flex-col items-center gap-1 text-white/45 hover:text-white/70 transition-colors">
-              <Icon name="leaderboard" />
-              <span className="text-[10px] font-black tracking-wide uppercase">
-                Rank
-              </span>
-            </button>
-
-            <button className="relative -mt-4">
-              <div className="size-14 rounded-full bg-primary text-background shadow-[0_0_30px_rgba(0,238,255,0.35)] flex items-center justify-center border border-primary/30">
-                <Icon name="play_arrow" fill className="text-[28px]" />
-              </div>
-            </button>
-
-            <button className="flex flex-col items-center gap-1 text-white/45 hover:text-white/70 transition-colors">
-              <Icon name="account_balance_wallet" />
-              <span className="text-[10px] font-black tracking-wide uppercase">
-                Wallet
-              </span>
-            </button>
-
-            <button className="flex flex-col items-center gap-1 text-white/45 hover:text-white/70 transition-colors">
-              <Icon name="person" />
-              <span className="text-[10px] font-black tracking-wide uppercase">
-                Profile
-              </span>
-            </button>
-          </nav>
         </div>
       ) : null}
       {tutorialStep !== null && (

@@ -40,13 +40,97 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
       case "Settings":
         router.push("/settings");
         break;
+      case "Quick Play":
+        router.push("/dashboard/quick-play/lobby");
+        break;
+      case "Wallet":
+        // Handle wallet action if needed
+        break;
       default:
         break;
     }
   };
 
+  const isActive = (path: string) => {
+    if (path === "/dashboard") {
+      return pathname === "/dashboard" || pathname === "/";
+    }
+    return pathname === path || pathname.startsWith(path);
+  };
+
   if (!isDesktop) {
-    return <>{children}</>;
+    return (
+      <div className="relative min-h-screen pb-20">
+        {children}
+        {/* Mobile Bottom Navigation */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-[#0a1516]/90 backdrop-blur-xl border-t border-white/5 px-6 py-3 flex justify-between items-end z-50 pb-6">
+          <button
+            onClick={() => handleNavClick("Lobby")}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              isActive("/dashboard")
+                ? "text-primary"
+                : "text-white/45 hover:text-white/70"
+            }`}
+          >
+            <Icon name="home" fill={isActive("/dashboard")} />
+            <span className="text-[10px] font-black tracking-wide uppercase">
+              Lobby
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick("Rank")}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              isActive("/rank")
+                ? "text-primary"
+                : "text-white/45 hover:text-white/70"
+            }`}
+          >
+            <Icon name="leaderboard" fill={isActive("/rank")} />
+            <span className="text-[10px] font-black tracking-wide uppercase">
+              Rank
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick("Quick Play")}
+            className="relative -mt-4"
+          >
+            <div className="size-14 rounded-full bg-primary text-background shadow-[0_0_30px_rgba(0,238,255,0.35)] flex items-center justify-center border border-primary/30">
+              <Icon name="play_arrow" fill className="text-[28px]" />
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleNavClick("Wallet")}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              isActive("/wallet")
+                ? "text-primary"
+                : "text-white/45 hover:text-white/70"
+            }`}
+          >
+            <Icon name="account_balance_wallet" fill={isActive("/wallet")} />
+            <span className="text-[10px] font-black tracking-wide uppercase">
+              Wallet
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick("Profile")}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              isActive("/dashboard/profile")
+                ? "text-primary"
+                : "text-white/45 hover:text-white/70"
+            }`}
+          >
+            <Icon name="person" fill={isActive("/dashboard/profile")} />
+            <span className="text-[10px] font-black tracking-wide uppercase">
+              Profile
+            </span>
+          </button>
+        </nav>
+      </div>
+    );
   }
 
   return (
