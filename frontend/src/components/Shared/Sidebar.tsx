@@ -79,16 +79,16 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
           </button>
 
           <button
-            onClick={() => handleNavClick("Rank")}
+            onClick={() => handleNavClick("Games")}
             className={`flex flex-col items-center gap-1 transition-colors ${
-              isActive("/rank")
+              isActive("/dashboard/games")
                 ? "text-primary"
                 : "text-white/45 hover:text-white/70"
             }`}
           >
-            <Icon name="leaderboard" fill={isActive("/rank")} />
+            <Icon name="stadia_controller" fill={isActive("/dashboard/games")} />
             <span className="text-[10px] font-black tracking-wide uppercase">
-              Rank
+              Games
             </span>
           </button>
 
@@ -102,16 +102,16 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
           </button>
 
           <button
-            onClick={() => handleNavClick("Wallet")}
+            onClick={() => handleNavClick("Rank")}
             className={`flex flex-col items-center gap-1 transition-colors ${
-              isActive("/wallet")
+              isActive("/rank")
                 ? "text-primary"
                 : "text-white/45 hover:text-white/70"
             }`}
           >
-            <Icon name="account_balance_wallet" fill={isActive("/wallet")} />
+            <Icon name="leaderboard" fill={isActive("/rank")} />
             <span className="text-[10px] font-black tracking-wide uppercase">
-              Wallet
+              Rank
             </span>
           </button>
 
