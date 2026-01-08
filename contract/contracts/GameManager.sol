@@ -234,12 +234,6 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
         return gameId;
     }
-
-    /**
-     * @notice Create Quick Play game with mETH
-     * @param entryFee Entry fee in mETH
-     * @param maxPlayers Maximum players
-     */
     function createQuickPlayGameMETH(
         uint256 entryFee,
         uint256 maxPlayers
