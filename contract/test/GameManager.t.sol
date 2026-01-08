@@ -171,7 +171,7 @@ contract GameManagerTest is TestHelpers {
         address[] memory players = gameManager.getGamePlayers(gameId);
         assertEq(players.length, 4);
 
-        // Game should now be full (4 players, max 4)
+   
         vm.prank(player5);
         vm.expectRevert();
         gameManager.joinGame{value: TEST_ENTRY_FEE}(gameId); // Should fail - game full
