@@ -6,10 +6,7 @@ import {GameManager} from "../contracts/GameManager.sol";
 import {YieldVault} from "../contracts/YieldVault.sol";
 import {TestHelpers} from "./helpers/TestHelpers.sol";
 
-/**
- * @title GameManagerTest
- * @notice Comprehensive test suite for GameManager contract
- */
+
 contract GameManagerTest is TestHelpers {
     uint256 public constant TEST_ENTRY_FEE = 0.01 ether;
     uint256 public constant TEST_MAX_PLAYERS = 10;
