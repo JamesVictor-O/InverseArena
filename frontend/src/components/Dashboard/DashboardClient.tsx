@@ -39,9 +39,9 @@ function ModeCard({
   return (
     <div
       id={mode.id === "quick" ? "mode-quick" : undefined}
-      className={`relative overflow-hidden rounded-3xl border bg-surface/25 backdrop-blur-xl ${primaryGlow}`}
+      className={`relative overflow-hidden rounded-3xl border bg-surface/25 backdrop-blur-xl`}
     >
-      <div className="absolute inset-0 bg-linear-to-br from-white/5 to-transparent opacity-70" />
+     
       <div className="relative p-5 lg:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -73,7 +73,7 @@ function ModeCard({
             onClick={() => onAction?.(mode)}
             className={`shrink-0 h-12 px-6 rounded-2xl font-black tracking-wide text-sm transition-all ${
               mode.actionTone === "primary"
-                ? "bg-primary text-background hover:bg-[#33f2ff] shadow-[0_0_25px_rgba(0,238,255,0.25)]"
+                ? "bg-primary text-background hover:bg-[#33f2ff] "
                 : "bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10"
             } ${mode.disabled ? "opacity-40 cursor-not-allowed" : ""}`}
           >
@@ -250,7 +250,6 @@ export default function DashboardClient() {
       ) : null}
       {!isDesktop ? (
         <div className="relative min-h-screen w-full overflow-hidden shadow-2xl font-display">
-          {/* MAIN CONTENT */}
           <main
             id="dashboard-scroll"
             className={`${styles.scrollContainer} flex-1 overflow-y-auto px-5 pb-20`}

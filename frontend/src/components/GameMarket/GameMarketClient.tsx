@@ -194,8 +194,7 @@ function GameCard({ game }: { game: Game }) {
 
 function FeaturedGameCard({ game }: { game: Game }) {
   return (
-    <div className="relative rounded-3xl border border-primary/30 bg-surface/40 backdrop-blur-xl overflow-hidden shadow-[0_0_40px_rgba(0,238,255,0.2)]">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-background/50" />
+    <div className="relative rounded-3xl border border-primary/30 bg-surface/40 backdrop-blur-xl overflow-hidden ">
       <div
         className="absolute inset-0 opacity-20"
         style={{
