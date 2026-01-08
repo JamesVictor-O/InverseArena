@@ -10,7 +10,8 @@
     "dev": "pnpm -C frontend dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
+  },
+  "dependencies": {
+    "@savingsatoshi/secp256k1js": "^1.0.1"
   }
 }
-
-
