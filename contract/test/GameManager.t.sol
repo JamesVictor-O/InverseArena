@@ -13,12 +13,8 @@ import {TestHelpers} from "./helpers/TestHelpers.sol";
 contract GameManagerTest is TestHelpers {
     uint256 public constant TEST_ENTRY_FEE = 0.01 ether;
     uint256 public constant TEST_MAX_PLAYERS = 10;
-  
-    // USDT0 entry fee: Contract validates entryFee >= MIN_ENTRY_FEE (10^15) directly
-    // Since contract compares raw uint256 values, we need to pass at least 10^15
-    // For USDT0 (6 decimals), this means: 10^15 USDT0 units = 1,000,000,000,000,000 = 1 billion USDT0
-    // This is a contract design issue - it should normalize by decimals, but for now we use minimum
-    uint256 public constant USDT0_ENTRY_FEE = 1000000000000000; // 10^15 (meets MIN_ENTRY_FEE requirement)
+
+    uint256 public constant USDT0_ENTRY_FEE = 1000000000000000; 
 
     // ============ Game Creation Tests ============
 
