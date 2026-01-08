@@ -5,7 +5,7 @@
 [![Mantle Network](https://img.shields.io/badge/Built%20on-Mantle-blue)](https://mantle.xyz)
 
 
-**Inverse Arena** is a revolutionary blockchain elimination game where going against the crowd wins—and your stake generates **institutional-grade yield** while you compete. Built exclusively on Mantle Network, leveraging USDT0, mETH, and Aave to create the first truly RWA-backed GameFi experience.
+**Inverse Arena**  RWA-Powered Elimination Game on Mantle and Base Where contrarian thinking meets **institutional-grade yield**. Player stakes automatically flow into USDT0, mETH, and Aave, generating real returns while you compete. The last player standing claims the prize pool + accumulated DeFi yields. Built exclusively on Mantle's modular infrastructure
 
 
 
