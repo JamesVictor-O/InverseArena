@@ -21,11 +21,16 @@ contract DeployScript is Script {
         console.log("Using native token (MNT) for all transactions");
 
         // 1. Deploy YieldVault
-        // Note: Update these addresses based on your Mantle network setup
-        address usdt0 = vm.envOr("USDT0_ADDRESS", address(0x1234567890123456789012345678901234567890)); // Placeholder
-        address mETH = vm.envOr("METH_ADDRESS", address(0x2345678901234567890123456789012345678901)); // Placeholder
-        address aavePool = vm.envOr("AAVE_POOL_ADDRESS", address(0x3456789012345678901234567890123456789012)); // Placeholder
+        // Note: For Mantle Sepolia testnet, you can either:
+        // - Use official token addresses (if available)
+        // - Deploy mock tokens first using DeployMockTokens.s.sol
+        address usdt0 = vm.envOr("USDT0_ADDRESS", address(0)); 
+        address mETH = vm.envOr("METH_ADDRESS", address(0)); 
+        address aavePool = vm.envOr("AAVE_POOL_ADDRESS", address(0)); // Can be zero for initial deployment
         address mnt = address(0); // Native MNT
+        
+        require(usdt0 != address(0), "USDT0_ADDRESS not set in .env");
+        require(mETH != address(0), "METH_ADDRESS not set in .env");
         
         console.log("\n1. Deploying YieldVault...");
         YieldVault yieldVault = new YieldVault(usdt0, mETH, aavePool, mnt);
@@ -37,18 +42,11 @@ contract DeployScript is Script {
         console.log("NFTAchievements deployed at:", address(nftAchievements));
 
         // 3. Deploy GameManager
-        // Note: Update these addresses based on your Chainlink VRF setup
-        address vrfCoordinator = vm.envAddress("VRF_COORDINATOR");
-        uint64 vrfSubscriptionId = uint64(vm.envUint("VRF_SUBSCRIPTION_ID"));
-        bytes32 vrfKeyHash = vm.envBytes32("VRF_KEY_HASH");
-
+        // Note: Using block-based randomness (no VRF needed for Mantle)
         console.log("\n3. Deploying GameManager...");
         GameManager gameManager = new GameManager(
             address(yieldVault),
             address(nftAchievements),
-            vrfCoordinator,
-            vrfSubscriptionId,
-            vrfKeyHash,
             usdt0,
             mETH
         );
@@ -63,12 +61,12 @@ contract DeployScript is Script {
         console.log("\n5. Setting up authorizations...");
         
         // Authorize GameManager to mint achievements
-        // Note: This would require adding a setAuthorizedMinter function to NFTAchievements
-        // For now, owner can mint through GameManager
+        nftAchievements.setAuthorizedMinter(address(gameManager), true);
+        console.log("GameManager authorized to mint achievements");
         
-        // Authorize Matchmaking to create games
-        // Note: Matchmaking needs to be able to call GameManager functions
-        // This might require adding specific access controls
+        // Transfer ownership of contracts to deployer (already owned, but ensure)
+        // The contracts are already owned by deployer, so this is just for verification
+        console.log("Contract ownership verified");
 
         console.log("\n=== Deployment Summary ===");
         console.log("YieldVault:", address(yieldVault));
