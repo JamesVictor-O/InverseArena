@@ -21,6 +21,7 @@
     "test": "forge test",
     "test:coverage": "forge coverage",
     "test:gas": "forge test --gas-report",
+    "deploy:sepolia": "forge script script/Deploy.s.sol:DeployScript --rpc-url mantle_sepolia --broadcast --verify",
     "deploy:testnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url mantle_testnet --broadcast --verify",
     "deploy:mainnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url mantle_mainnet --broadcast --verify",
     "verify": "forge verify-contract",
