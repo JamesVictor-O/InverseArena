@@ -5,11 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./GameManager.sol";
 
-/**
- * @title Matchmaking
- * @notice Handles player matchmaking and game queue management
- * @dev Eliminates the "waiting room problem" through intelligent matchmaking
- */
+
 contract Matchmaking is Ownable, ReentrancyGuard {
     // ============ Structs ============
 
@@ -119,7 +115,6 @@ contract Matchmaking is Ownable, ReentrancyGuard {
 
         emit PlayerQueued(msg.sender, mode, entryFee);
 
-        // Try to match players
         _tryMatchPlayers(mode);
     }
 
@@ -131,14 +126,10 @@ contract Matchmaking is Ownable, ReentrancyGuard {
 
         GameManager.GameMode mode = playerQueueMode[msg.sender];
         QueueEntry[] storage queue = queues[mode];
-
-        // Find and remove player
         for (uint256 i = 0; i < queue.length; i++) {
             if (queue[i].player == msg.sender) {
-                // Refund entry fee
                 payable(msg.sender).transfer(queue[i].entryFee);
 
-                // Remove from queue
                 queue[i] = queue[queue.length - 1];
                 queue.pop();
 
@@ -183,9 +174,6 @@ contract Matchmaking is Ownable, ReentrancyGuard {
         return playersNeeded * avgTimePerPlayer;
     }
 
-    /**
-     * @notice Get queue status for a game mode
-     */
     function getQueueStatus(
         GameManager.GameMode mode
     ) external view returns (
@@ -203,9 +191,6 @@ contract Matchmaking is Ownable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @notice Get players in queue for a game mode
-     */
     function getQueuePlayers(
         GameManager.GameMode mode
     ) external view returns (address[] memory players) {
@@ -217,27 +202,19 @@ contract Matchmaking is Ownable, ReentrancyGuard {
         return players;
     }
 
-    // ============ Internal Functions ============
 
-    /**
-     * @notice Try to match players and create game
-     */
     function _tryMatchPlayers(GameManager.GameMode mode) internal {
         QueueEntry[] storage queue = queues[mode];
         MatchmakingConfig memory config = configs[mode];
 
-        // Check if we have enough players
         if (queue.length < config.autoStartThreshold) {
             return;
         }
-
-        // Group players by similar entry fees (within 10% tolerance)
         address[] memory matchedPlayers = new address[](config.maxPlayers);
         uint256[] memory entryFees = new uint256[](config.maxPlayers);
         uint256 matchedCount = 0;
         uint256 baseEntryFee = queue[0].entryFee;
 
-        // Match players with similar entry fees
         for (uint256 i = 0; i < queue.length && matchedCount < config.maxPlayers; i++) {
             QueueEntry memory entry = queue[i];
             

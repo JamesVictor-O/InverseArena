@@ -45,6 +45,7 @@ contract NFTAchievements is ERC721URIStorage, Ownable, INFTAchievements {
     mapping(address => uint256[]) public userAchievements;
     mapping(address => mapping(AchievementType => bool)) private _hasAchievement;
     mapping(address => uint256) public userAchievementCount;
+    mapping(address => bool) public authorizedMinters;
 
     string public baseURI = "https://api.inversearena.xyz/achievements/";
 
@@ -216,9 +217,7 @@ contract NFTAchievements is ERC721URIStorage, Ownable, INFTAchievements {
      * @notice Check if address is authorized to mint
      */
     function _isAuthorizedMinter(address minter) internal view returns (bool) {
-        // In production, this would check against a whitelist of authorized contracts
-        // For now, only owner can mint
-        return minter == owner();
+        return minter == owner() || authorizedMinters[minter];
     }
 
     /**
@@ -269,8 +268,8 @@ contract NFTAchievements is ERC721URIStorage, Ownable, INFTAchievements {
      * @notice Authorize a contract to mint achievements
      */
     function setAuthorizedMinter(address minter, bool authorized) external onlyOwner {
-        // This would update a mapping in production
-        // For now, handled by _isAuthorizedMinter
+        require(minter != address(0), "Invalid minter address");
+        authorizedMinters[minter] = authorized;
     }
 
     // ============ Override Functions ============
