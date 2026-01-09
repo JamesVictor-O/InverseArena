@@ -5,13 +5,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "chainlink-brownie-contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import "chainlink-brownie-contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
 import "./interfaces/IYieldVault.sol";
 import "./interfaces/INFTAchievements.sol";
 
 
-contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
+contract GameManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     
     enum GameMode {
@@ -88,17 +86,10 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
     IYieldVault public yieldVault;
     INFTAchievements public nftAchievements;
-    VRFCoordinatorV2Interface public vrfCoordinator;
-
-    uint64 public vrfSubscriptionId;
-    bytes32 public vrfKeyHash;
-    uint32 public vrfCallbackGasLimit = 500000;
-    uint16 public vrfRequestConfirmations = 3;
 
    
     mapping(uint256 => Game) public games;
     mapping(uint256 => mapping(uint256 => Round)) public rounds;
-    mapping(uint256 => uint256) public vrfRequestToGameId;
     mapping(address => uint256[]) public playerGames;
     mapping(uint256 => mapping(address => PlayerInfo)) public playerInfo;
 
@@ -182,17 +173,11 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     constructor(
         address _yieldVault,
         address _nftAchievements,
-        address _vrfCoordinator,
-        uint64 _vrfSubscriptionId,
-        bytes32 _vrfKeyHash,
         address _usdt0,
         address _mETH
-    ) VRFConsumerBaseV2(_vrfCoordinator) Ownable(msg.sender) {
+    ) Ownable(msg.sender) {
         yieldVault = IYieldVault(_yieldVault);
         nftAchievements = INFTAchievements(_nftAchievements);
-        vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
-        vrfSubscriptionId = _vrfSubscriptionId;
-        vrfKeyHash = _vrfKeyHash;
         
         USDT0 = _usdt0;
         mETH = _mETH;
@@ -292,12 +277,7 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         return gameId;
     }
 
-    /**
-     * @notice Create Scheduled Tournament (USDT0)
-     * @param startTime Unix timestamp for game start
-     * @param entryFee Entry fee in USDT0
-     * @param maxPlayers Maximum players
-     */
+  
     function createScheduledTournamentUSDT0(
         uint256 startTime,
         uint256 entryFee,
@@ -431,9 +411,11 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
         emit ChoiceMade(gameId, msg.sender, game.currentRound, choice);
 
-    
+        // Process round immediately when all players have chosen
+        // Uses block-based randomness (blockhash + timestamp + game data)
         if (_allPlayersChosen(gameId)) {
-            _requestVRF(gameId);
+            uint256 randomness = _generateRandomness(gameId);
+            _processRound(gameId, randomness);
         }
     }
 
@@ -492,23 +474,55 @@ contract GameManager is Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         round.timestamp = block.timestamp;
     }
 
-    function _requestVRF(uint256 gameId) internal {
-        uint256 requestId = vrfCoordinator.requestRandomWords(
-            vrfKeyHash,
-            vrfSubscriptionId,
-            vrfRequestConfirmations,
-            vrfCallbackGasLimit,
-            1
-        );
-        vrfRequestToGameId[requestId] = gameId;
-    }
-
-    function fulfillRandomWords(
-        uint256 requestId,
-        uint256[] memory randomWords
-    ) internal override {
-        uint256 gameId = vrfRequestToGameId[requestId];
-        _processRound(gameId, randomWords[0]);
+    /**
+     * @notice Generates pseudo-random number using block-based entropy
+     * @dev Combines blockhash, timestamp, game data, and player addresses for randomness
+     * @param gameId The game ID to generate randomness for
+     * @return A pseudo-random uint256 value
+     */
+    function _generateRandomness(uint256 gameId) internal view returns (uint256) {
+        Game storage game = games[gameId];
+        Round storage round = rounds[gameId][game.currentRound];
+        
+        // Combine multiple sources of entropy for better randomness
+        // Use current blockhash if previous blockhash is not available (test environments)
+        bytes32 blockHash = blockhash(block.number - 1);
+        if (blockHash == bytes32(0) && block.number > 0) {
+            blockHash = blockhash(block.number);
+        }
+        if (blockHash == bytes32(0)) {
+            blockHash = keccak256(abi.encodePacked(block.number, block.timestamp));
+        }
+        uint256 timestamp = block.timestamp;
+        
+        // Include game-specific data
+        uint256 gameData = uint256(keccak256(abi.encodePacked(
+            gameId,
+            game.currentRound,
+            game.startTime,
+            round.timestamp
+        )));
+        
+        // Include player addresses for additional entropy
+        bytes32 playerEntropy = bytes32(0);
+        for (uint256 i = 0; i < game.playerList.length; i++) {
+            if (!playerInfo[gameId][game.playerList[i]].eliminated) {
+                playerEntropy = keccak256(abi.encodePacked(
+                    playerEntropy,
+                    game.playerList[i],
+                    round.choices[game.playerList[i]]
+                ));
+            }
+        }
+        
+        return uint256(keccak256(abi.encodePacked(
+            blockHash,
+            timestamp,
+            gameData,
+            playerEntropy,
+            block.prevrandao, 
+            block.number
+        )));
     }
 
     function _processRound(uint256 gameId, uint256 randomness) internal {
