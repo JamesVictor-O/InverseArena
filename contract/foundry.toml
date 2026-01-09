@@ -24,6 +24,7 @@ optimizer_runs = 10000
 via_ir = true
 
 [rpc_endpoints]
+mantle_sepolia = "https://rpc.sepolia.mantle.xyz"
 mantle_testnet = "https://rpc.testnet.mantle.xyz"
 mantle_mainnet = "https://rpc.mantle.xyz"
 base_sepolia = "https://sepolia.base.org"
