@@ -6,7 +6,6 @@ import {GameManager} from "../../contracts/GameManager.sol";
 import {YieldVault} from "../../contracts/YieldVault.sol";
 import {NFTAchievements} from "../../contracts/NFTAchievements.sol";
 import {Matchmaking} from "../../contracts/Matchmaking.sol";
-import {MockVRFCoordinator} from "../mocks/MockVRFCoordinator.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 
 /**
@@ -19,7 +18,6 @@ contract TestHelpers is Test {
     YieldVault public yieldVault;
     NFTAchievements public nftAchievements;
     Matchmaking public matchmaking;
-    MockVRFCoordinator public vrfCoordinator;
     MockERC20 public usdt0;
     MockERC20 public mETH;
 
@@ -38,8 +36,6 @@ contract TestHelpers is Test {
     uint256 public constant ENTRY_FEE = 0.01 ether;
     uint256 public constant MIN_PLAYERS = 4;
     uint256 public constant MAX_PLAYERS = 20;
-    uint64 public constant VRF_SUBSCRIPTION_ID = 1;
-    bytes32 public constant VRF_KEY_HASH = keccak256("test_key");
 
     // Events
     event GameCreated(uint256 indexed gameId, address indexed creator, GameManager.GameMode mode);
@@ -55,9 +51,6 @@ contract TestHelpers is Test {
         usdt0 = new MockERC20("USDT0", "USDT0", 6);
         mETH = new MockERC20("mETH", "mETH", 18);
 
-        // Deploy VRF Coordinator
-        vrfCoordinator = new MockVRFCoordinator();
-
         // Deploy YieldVault
         yieldVault = new YieldVault(
             address(usdt0),
@@ -69,13 +62,10 @@ contract TestHelpers is Test {
         // Deploy NFTAchievements
         nftAchievements = new NFTAchievements();
 
-        // Deploy GameManager
+        // Deploy GameManager (no VRF needed - uses block-based randomness)
         gameManager = new GameManager(
             address(yieldVault),
             address(nftAchievements),
-            address(vrfCoordinator),
-            VRF_SUBSCRIPTION_ID,
-            VRF_KEY_HASH,
             address(usdt0),
             address(mETH)
         );
@@ -130,14 +120,7 @@ contract TestHelpers is Test {
         mETH.mint(player8, 1000 * 10**18);
     }
 
-    /**
-     * @notice Helper to fulfill VRF request
-     */
-    function fulfillVRF(uint256 requestId, uint256 randomness) internal {
-        uint256[] memory randomWords = new uint256[](1);
-        randomWords[0] = randomness;
-        vrfCoordinator.fulfillRandomWords(requestId, randomWords);
-    }
+    // Note: VRF removed - randomness is now block-based and processed immediately
 
     /**
      * @notice Helper to create a game and get players to minimum

@@ -13,7 +13,7 @@ contract GameManagerTest is TestHelpers {
 
     uint256 public constant USDT0_ENTRY_FEE = 1000000000000000; 
 
-    // ============ Game Creation Tests ============
+    
 
     function testCreateQuickPlayGameMNT() public {
         vm.prank(player1);
@@ -148,7 +148,6 @@ contract GameManagerTest is TestHelpers {
     }
 
     function test_RevertWhen_JoinFullGame() public {
-        // Use maxPlayers = 4 (MIN_PLAYERS) to test full game scenario
         uint256 maxPlayers = 4;
         vm.prank(player1);
         uint256 gameId = gameManager.createQuickPlayGame{value: TEST_ENTRY_FEE}(TEST_ENTRY_FEE, maxPlayers);
@@ -160,7 +159,7 @@ contract GameManagerTest is TestHelpers {
         vm.prank(player4);
         gameManager.joinGame{value: TEST_ENTRY_FEE}(gameId);
 
-        // Verify game is full (4 players joined, max 4)
+        
         address[] memory players = gameManager.getGamePlayers(gameId);
         assertEq(players.length, 4);
 
@@ -199,7 +198,7 @@ contract GameManagerTest is TestHelpers {
 
         vm.prank(player1);
         vm.expectRevert();
-        gameManager.makeChoice(gameId, GameManager.Choice.Tail); // Should fail
+        gameManager.makeChoice(gameId, GameManager.Choice.Tail);
     }
 
     function test_RevertWhen_MakeChoiceBeforeGameStarts() public {
@@ -211,24 +210,44 @@ contract GameManagerTest is TestHelpers {
         gameManager.makeChoice(gameId, GameManager.Choice.Head); // Should fail - game not started
     }
 
-    // ============ Round Processing Tests ============
 
     function testProcessRoundMinoritySurvives() public {
-        uint256 gameId = createGameWithMinPlayers(
-            GameManager.Currency.MNT,
-            TEST_ENTRY_FEE,
-            TEST_MAX_PLAYERS
-        );
-
-        // Players make choices: 3 Head, 1 Tail
+        // Create game with 4 players (min required) - game will start when 4th player joins
+        vm.prank(player1);
+        uint256 gameId = gameManager.createQuickPlayGame{value: TEST_ENTRY_FEE}(TEST_ENTRY_FEE, 4);
+        
+        // Join 3 more players (game starts when 4th player joins)
+        vm.prank(player2);
+        gameManager.joinGame{value: TEST_ENTRY_FEE}(gameId);
+        vm.prank(player3);
+        gameManager.joinGame{value: TEST_ENTRY_FEE}(gameId);
+        vm.prank(player5); // Use player5 instead of player4 (address(5) is ECRecover precompile)
+        gameManager.joinGame{value: TEST_ENTRY_FEE}(gameId);
+        
+        // Now make choices: 3 Head, 1 Tail (Tail should survive)
         vm.prank(player1);
         gameManager.makeChoice(gameId, GameManager.Choice.Head);
         vm.prank(player2);
         gameManager.makeChoice(gameId, GameManager.Choice.Head);
         vm.prank(player3);
         gameManager.makeChoice(gameId, GameManager.Choice.Head);
-        vm.prank(player4);
+        vm.prank(player5);
         gameManager.makeChoice(gameId, GameManager.Choice.Tail);
+        
+        // Round should be processed immediately when all players choose
+        // Check that Tail player survived (minority survives)
+        GameManager.PlayerInfo memory tailPlayer = gameManager.getPlayerInfo(gameId, player5);
+        assertTrue(!tailPlayer.eliminated, "Tail player (minority) should survive");
+        assertEq(tailPlayer.roundEliminated, 0, "Tail player should not be eliminated");
+        
+        // Check that Head players were eliminated (majority eliminated)
+        GameManager.PlayerInfo memory headPlayer1 = gameManager.getPlayerInfo(gameId, player1);
+        assertTrue(headPlayer1.eliminated, "Head player 1 (majority) should be eliminated");
+        assertGt(headPlayer1.roundEliminated, 0, "Head player 1 should have elimination round set");
+        
+        GameManager.PlayerInfo memory headPlayer2 = gameManager.getPlayerInfo(gameId, player2);
+        assertTrue(headPlayer2.eliminated, "Head player 2 (majority) should be eliminated");
+        
     }
 
 
