@@ -177,121 +177,121 @@ export function ProfileClient() {
         <div className="lg:grid lg:grid-cols-12 lg:gap-8">
           {/* Left Column: Profile Info + Stats */}
           <div className="lg:col-span-5 space-y-6 lg:space-y-8">
-            {/* Profile Section */}
+        {/* Profile Section */}
             <section>
               <div className="flex flex-col items-center text-center">
-                {/* Avatar */}
-                <div className="relative mb-4">
+            {/* Avatar */}
+            <div className="relative mb-4">
                   <div className="w-24 h-24 lg:w-36 lg:h-36 rounded-full border-2 border-primary shadow-neon overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
-                    {profile.avatar ? (
-                      <img
-                        src={profile.avatar}
-                        alt={profile.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
+                {profile.avatar ? (
+                  <img
+                    src={profile.avatar}
+                    alt={profile.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
                       <div className="w-full h-full flex items-center justify-center text-3xl lg:text-5xl font-black">
-                        {profile.name.charAt(0)}
-                      </div>
-                    )}
+                    {profile.name.charAt(0)}
                   </div>
-                  <button className="absolute bottom-0 right-0 w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-primary border-2 border-background flex items-center justify-center text-background hover:bg-[#33f2ff] transition-colors shadow-neon">
-                    <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
-                  </button>
-                </div>
+                )}
+              </div>
+              <button className="absolute bottom-0 right-0 w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-primary border-2 border-background flex items-center justify-center text-background hover:bg-[#33f2ff] transition-colors shadow-neon">
+                <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
+              </button>
+            </div>
 
-                {/* Name & Username */}
+            {/* Name & Username */}
                 <h2 className="text-2xl lg:text-4xl font-black mb-2">
-                  {profile.name}
-                </h2>
-                <div className="flex items-center gap-2 mb-3">
+              {profile.name}
+            </h2>
+            <div className="flex items-center gap-2 mb-3">
                   <span className="text-sm lg:text-lg text-primary font-medium">
-                    @{profile.username}
-                  </span>
-                  <button
-                    onClick={handleCopyUsername}
-                    className="p-1 text-gray-400 hover:text-primary transition-colors"
-                  >
+                @{profile.username}
+              </span>
+              <button
+                onClick={handleCopyUsername}
+                className="p-1 text-gray-400 hover:text-primary transition-colors"
+              >
                     <Copy className="w-4 h-4 lg:w-5 lg:h-5" />
-                  </button>
-                </div>
+              </button>
+            </div>
 
-                {/* Level Badge */}
+            {/* Level Badge */}
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 lg:px-5 lg:py-2 rounded-full bg-primary/10 border border-primary/30 text-primary">
                   <Trophy className="w-4 h-4 lg:w-5 lg:h-5" />
                   <span className="text-xs lg:text-sm font-black uppercase tracking-wider">
-                    LEVEL {profile.level} - {profile.rank}
-                  </span>
-                </div>
-              </div>
-            </section>
+                LEVEL {profile.level} - {profile.rank}
+              </span>
+            </div>
+          </div>
+        </section>
 
-            {/* Statistics Grid */}
+        {/* Statistics Grid */}
             <section>
-              <div className="grid grid-cols-2 gap-3 lg:gap-4 mb-3 lg:mb-4">
-                <StatCard
-                  label="WIN RATE"
-                  value={`${profile.winRate}%`}
-                  subtitle={`+${profile.winRateChange}% this week`}
+          <div className="grid grid-cols-2 gap-3 lg:gap-4 mb-3 lg:mb-4">
+            <StatCard
+              label="WIN RATE"
+              value={`${profile.winRate}%`}
+              subtitle={`+${profile.winRateChange}% this week`}
                   icon={<BarChart3 className="w-5 h-5 lg:w-6 lg:h-6" />}
                   trend={{
                     value: `+${profile.winRateChange}% this week`,
                     positive: true,
                   }}
-                />
-                <StatCard
-                  label="TOTAL WINS"
-                  value={profile.totalWins.toString()}
-                  subtitle={`Out of ${profile.totalGames} games`}
+            />
+            <StatCard
+              label="TOTAL WINS"
+              value={profile.totalWins.toString()}
+              subtitle={`Out of ${profile.totalGames} games`}
                   icon={<Award className="w-5 h-5 lg:w-6 lg:h-6" />}
-                />
-              </div>
-              <StatCard
-                label="TOTAL EARNED"
+            />
+          </div>
+          <StatCard
+            label="TOTAL EARNED"
                 value={`${profile.totalEarned.toLocaleString()} ${
                   profile.currency
                 }`}
                 icon={<DollarSign className="w-5 h-5 lg:w-6 lg:h-6" />}
-              />
-            </section>
+          />
+        </section>
           </div>
 
           {/* Right Column: Achievements + Recent Games */}
           <div className="lg:col-span-7 space-y-6 lg:space-y-8 mt-8 lg:mt-0">
-            {/* Achievements */}
+        {/* Achievements */}
             <section>
-              <div className="flex items-center justify-between mb-4 lg:mb-6">
-                <h3 className="text-sm lg:text-base font-black uppercase tracking-wider">
-                  ACHIEVEMENTS
-                </h3>
-                <button className="text-xs lg:text-sm text-primary font-bold hover:text-[#33f2ff] transition-colors">
-                  VIEW ALL
-                </button>
-              </div>
+          <div className="flex items-center justify-between mb-4 lg:mb-6">
+            <h3 className="text-sm lg:text-base font-black uppercase tracking-wider">
+              ACHIEVEMENTS
+            </h3>
+            <button className="text-xs lg:text-sm text-primary font-bold hover:text-[#33f2ff] transition-colors">
+              VIEW ALL
+            </button>
+          </div>
               <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-4">
-                {achievements.map((achievement) => (
+            {achievements.map((achievement) => (
                   <AchievementCard
                     key={achievement.id}
                     achievement={achievement}
                   />
-                ))}
-              </div>
-            </section>
+            ))}
+          </div>
+        </section>
 
-            {/* Recent Games */}
+        {/* Recent Games */}
             <section>
-              <h3 className="text-sm lg:text-base font-black uppercase tracking-wider mb-4 lg:mb-6">
-                RECENT GAMES
-              </h3>
-              <div className="space-y-3 lg:space-y-4">
-                {recentGames.map((game) => (
-                  <GameHistoryCard key={game.id} game={game} />
-                ))}
-              </div>
-              <button className="w-full mt-6 lg:mt-8 py-3 lg:py-4 rounded-xl border border-white/10 bg-surface/30 hover:bg-surface/50 text-white font-black uppercase tracking-wider text-sm lg:text-base transition-colors">
-                VIEW FULL HISTORY
-              </button>
-            </section>
+          <h3 className="text-sm lg:text-base font-black uppercase tracking-wider mb-4 lg:mb-6">
+            RECENT GAMES
+          </h3>
+          <div className="space-y-3 lg:space-y-4">
+            {recentGames.map((game) => (
+              <GameHistoryCard key={game.id} game={game} />
+            ))}
+          </div>
+          <button className="w-full mt-6 lg:mt-8 py-3 lg:py-4 rounded-xl border border-white/10 bg-surface/30 hover:bg-surface/50 text-white font-black uppercase tracking-wider text-sm lg:text-base transition-colors">
+            VIEW FULL HISTORY
+          </button>
+        </section>
           </div>
         </div>
       </main>
@@ -309,16 +309,16 @@ export function ProfileClient() {
               pathname === item.path ||
               (item.path === "/dashboard" && pathname === "/");
             return (
-              <button
-                key={item.label}
+            <button
+              key={item.label}
                 onClick={() => handleNavClick(item.label)}
-                className={`flex flex-col items-center justify-center gap-1 text-xs font-bold transition-colors ${
+              className={`flex flex-col items-center justify-center gap-1 text-xs font-bold transition-colors ${
                   isActive ? "text-primary" : "text-gray-400 hover:text-white"
-                }`}
-              >
-                <span className="text-lg">{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
+              }`}
+            >
+              <span className="text-lg">{item.icon}</span>
+              <span>{item.label}</span>
+            </button>
             );
           })}
         </div>

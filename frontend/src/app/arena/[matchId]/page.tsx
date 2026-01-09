@@ -8,4 +8,3 @@ export default async function ArenaRoundPage({
   const { matchId } = await params;
   return <ArenaRoundClient matchId={matchId} />;
 }
-
