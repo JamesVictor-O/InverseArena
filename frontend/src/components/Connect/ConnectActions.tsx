@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useMemo } from "react";
+import React, { createContext, useContext, useMemo, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 
 type ConnectActions = {
@@ -12,6 +12,8 @@ type ConnectActions = {
 };
 
 const ConnectActionsContext = createContext<ConnectActions | null>(null);
+
+const STAY_DISCONNECTED_KEY = "inverse_arena_stay_disconnected";
 
 function useIsPrivyEnabled() {
   return process.env.NEXT_PUBLIC_ENABLE_PRIVY === "true";
@@ -33,9 +35,29 @@ function EnabledPrivyActionsProvider({
     link?: unknown;
   };
 
+  // Prevent auto-connect if user has explicitly disconnected
+  useEffect(() => {
+    if (!privy.ready) return;
+
+    const stayDisconnected = typeof window !== "undefined" 
+      ? localStorage.getItem(STAY_DISCONNECTED_KEY) === "true"
+      : false;
+    
+    // If user explicitly disconnected and Privy auto-authenticated, log them out
+    if (stayDisconnected && privy.authenticated && typeof privy.logout === "function") {
+      void privy.logout();
+    }
+  }, [privy.ready, privy.authenticated]);
+
   const value = useMemo<ConnectActions>(() => {
     const isReady = Boolean(privy.ready);
-    const isAuthenticated = Boolean(privy.authenticated);
+    
+    // Don't show as authenticated if user has explicitly disconnected
+    const stayDisconnected = typeof window !== "undefined" 
+      ? localStorage.getItem(STAY_DISCONNECTED_KEY) === "true"
+      : false;
+    
+    const isAuthenticated = Boolean(privy.authenticated) && !stayDisconnected;
 
     const userAny = privy.user as unknown as {
       wallet?: { address?: string };
@@ -43,11 +65,14 @@ function EnabledPrivyActionsProvider({
       linkedAccounts?: Array<{ type?: string; address?: string }>;
     } | null;
 
-    const walletAddress: string | null =
+    const walletAddressRaw: string | null =
       userAny?.wallet?.address ??
       userAny?.wallets?.[0]?.address ??
       userAny?.linkedAccounts?.find((a) => a?.type === "wallet")?.address ??
       null;
+    
+    // Don't show wallet address if user has explicitly disconnected
+    const walletAddress = stayDisconnected ? null : walletAddressRaw;
 
     return {
       connectWallet: () => {
@@ -59,6 +84,11 @@ function EnabledPrivyActionsProvider({
         const authenticated = Boolean(privy.authenticated);
 
         try {
+          // Clear the stay disconnected flag when user explicitly connects
+          if (typeof window !== "undefined") {
+            localStorage.removeItem(STAY_DISCONNECTED_KEY);
+          }
+
           if (!authenticated) {
             void privy.login?.();
             return true;
@@ -104,6 +134,11 @@ function EnabledPrivyActionsProvider({
         }
 
         try {
+          // Set flag to prevent auto-connect on refresh
+          if (typeof window !== "undefined") {
+            localStorage.setItem(STAY_DISCONNECTED_KEY, "true");
+          }
+
           if (typeof privy.logout === "function") {
             void privy.logout();
           } else {
@@ -150,6 +185,14 @@ function DirectWalletProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     // Check if wallet is already connected
     const checkConnection = async () => {
+      // Check if user has explicitly disconnected
+      const stayDisconnected = localStorage.getItem(STAY_DISCONNECTED_KEY) === "true";
+      
+      if (stayDisconnected) {
+        setIsReady(true);
+        return;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ethereum =
         typeof window !== "undefined" ? (window as any).ethereum : null;
@@ -183,6 +226,11 @@ function DirectWalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const connectWallet = React.useCallback(async (): Promise<boolean> => {
+    // Clear the stay disconnected flag when user explicitly connects
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(STAY_DISCONNECTED_KEY);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ethereum =
       typeof window !== "undefined" ? (window as any).ethereum : null;
@@ -214,6 +262,10 @@ function DirectWalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const disconnect = React.useCallback(() => {
+    // Set flag to prevent auto-connect on refresh
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STAY_DISCONNECTED_KEY, "true");
+    }
     setWalletAddress(null);
   }, []);
 

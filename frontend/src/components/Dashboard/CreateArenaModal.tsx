@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { X, Pencil, Wallet, Users, Lock, FileText, Fuel } from "lucide-react";
+import { X, Pencil, Wallet, Users, Lock } from "lucide-react";
 import { Icon } from "./Icon";
 import {
   Currency,
@@ -45,16 +45,7 @@ export function CreateArenaModal({
   const { walletAddress, connectWallet } = useConnectActions();
   const { getCreatorStake, stakeAsCreator } = useGameManager();
 
-  // Check if user has stake when modal opens
-  React.useEffect(() => {
-    if (open && walletAddress) {
-      checkStake();
-    } else if (!walletAddress) {
-      setHasStake(null);
-    }
-  }, [open, walletAddress]);
-
-  const checkStake = async () => {
+  const checkStake = React.useCallback(async () => {
     try {
       const stakeInfo = await getCreatorStake();
       setHasStake(stakeInfo?.hasStaked ?? false);
@@ -62,7 +53,16 @@ export function CreateArenaModal({
       console.error("Error checking stake:", err);
       setHasStake(false);
     }
-  };
+  }, [getCreatorStake]);
+
+  // Check if user has stake when modal opens
+  React.useEffect(() => {
+    if (open && walletAddress) {
+      checkStake();
+    } else if (!walletAddress) {
+      setHasStake(null);
+    }
+  }, [open, walletAddress, checkStake]);
 
   const handleStake = async (amount: number) => {
     const success = await stakeAsCreator(amount);
@@ -105,6 +105,7 @@ export function CreateArenaModal({
     }
 
     setIsCreating(true);
+    setError(null);
 
     try {
       await onCreate({
@@ -123,11 +124,12 @@ export function CreateArenaModal({
       setMaxPlayers(8);
       setIsPrivate(false);
       setAdditionalRules("");
-      setIsCreating(false);
+      // Modal will be closed by parent on success
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to create game";
       setError(message);
+    } finally {
       setIsCreating(false);
     }
   };
@@ -170,7 +172,7 @@ export function CreateArenaModal({
           {/* Arena Name */}
           <div>
             <label className="block text-sm font-bold text-white/70 mb-2">
-              Arena Name (Optional)
+              Arena Name
             </label>
             <div className="relative">
               <Pencil className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
@@ -212,8 +214,6 @@ export function CreateArenaModal({
               ))}
             </div>
           </div>
-
-          {/* Entry Fee */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -306,23 +306,6 @@ export function CreateArenaModal({
               Invite code required to join
             </p>
           </div>
-
-          {/* Additional Rules */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="w-4 h-4 text-primary" />
-              <label className="text-sm font-bold text-white/70">
-                Additional Rules
-              </label>
-            </div>
-            <textarea
-              value={additionalRules}
-              onChange={(e) => setAdditionalRules(e.target.value)}
-              placeholder="Winner takes all. No teaming allowed..."
-              rows={4}
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-primary transition-colors resize-none"
-            />
-          </div>
         </div>
 
         {/* Error Message */}
@@ -362,7 +345,7 @@ export function CreateArenaModal({
               )}
             </button>
           </div>
-       
+
           {currencyInfo.apy > 0 && (
             <div className="mt-2 p-3 rounded-xl bg-primary/10 border border-primary/20">
               <p className="text-xs text-primary font-bold text-center">
