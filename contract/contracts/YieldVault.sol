@@ -73,6 +73,9 @@ contract YieldVault is IYieldVault, Ownable, ReentrancyGuard {
     // Aave-specific
     address public aUSDT0;          // Aave interest-bearing USDT0
     address public amETH;           // Aave interest-bearing mETH
+    
+    // GameManager reference for controlled withdrawals
+    address public gameManager;
 
     // ============ APY Configuration ============
     
@@ -129,6 +132,14 @@ contract YieldVault is IYieldVault, Ownable, ReentrancyGuard {
         uint256 timestamp,
         uint256 yieldAccumulated,
         uint256 currentAPY
+    );
+
+    event YieldWithdrawnToContract(
+        uint256 indexed gameId,
+        uint256 principalAmount,
+        uint256 yieldAmount,
+        uint256 totalAmount,
+        address recipient
     );
 
     // ============ Constructor ============
@@ -284,6 +295,41 @@ contract YieldVault is IYieldVault, Ownable, ReentrancyGuard {
     }
 
  
+    /**
+     * @notice Deposit native MNT for yield generation
+     * @param gameId Associated game ID
+     * @param amount Amount of MNT to deposit
+     * @return shares Shares received
+     */
+    function depositMNT(
+        uint256 gameId,
+        uint256 amount
+    ) external payable nonReentrant returns (uint256 shares) {
+        require(msg.value >= amount, "Insufficient payment");
+        require(protocols[PROTOCOL_METH].enabled, "mETH protocol disabled");
+        require(amount > 0, "Amount must be > 0");
+
+        shares = _calculateShares(amount, address(0), PROTOCOL_METH);
+        _storeDeposit(gameId, address(0), amount, shares, PROTOCOL_METH);
+
+        emit DepositedToProtocol(
+            gameId,
+            address(0),
+            amount,
+            shares,
+            PROTOCOL_METH,
+            "Mantle Staked ETH"
+        );
+
+        return shares;
+    }
+
+    /**
+     * @notice Deposit native MNT (legacy support - uses gameId 0, deprecated)
+     * @param amount Amount to deposit
+     * @param protocol Protocol identifier (0 = mETH, 1 = USDT0, etc.)
+     * @return shares Shares received
+     */
     function depositToYield(
         uint256 amount,
         uint8 protocol
@@ -403,10 +449,6 @@ contract YieldVault is IYieldVault, Ownable, ReentrancyGuard {
         emit YieldDistributed(gameId, winner, deposit.amount, yieldAmount, totalPayout);
     }
 
-    /**
-     * @notice Emit real-time yield update (call during gameplay)
-     * @param gameId Game ID
-     */
     function emitYieldSnapshot(uint256 gameId) external {
         GameDeposit memory deposit = gameDeposits[gameId];
         require(deposit.active, "Deposit not active");
@@ -417,11 +459,53 @@ contract YieldVault is IYieldVault, Ownable, ReentrancyGuard {
         emit RealTimeYieldSnapshot(gameId, block.timestamp, currentYield, currentAPY);
     }
 
+  
+    function withdrawToContract(uint256 gameId) external nonReentrant returns (uint256 principal, uint256 yieldAccumulated) {
+        require(msg.sender == gameManager, "Only GameManager");
+        
+        GameDeposit storage deposit = gameDeposits[gameId];
+        require(deposit.active, "Deposit not active");
+
+        // Calculate accumulated yield
+        yieldAccumulated = this.getAccumulatedYield(gameId);
+        principal = deposit.amount;
+        uint256 totalAmount = principal + yieldAccumulated;
+
+        // Update state
+        gameYield[gameId] = yieldAccumulated;
+        totalYieldGenerated += yieldAccumulated;
+        deposit.active = false;
+
+        // Update protocol totals
+        ProtocolInfo storage protocol = protocols[deposit.protocol];
+        protocol.totalDeposited -= principal;
+        protocol.totalShares -= deposit.shares;
+        
+        totalValueLocked -= principal;
+        totalValueLockedByAsset[deposit.currency] -= principal;
+
+        // Transfer principal + yield to calling contract (GameManager)
+        if (deposit.currency == address(0)) {
+            // Native token
+            payable(msg.sender).transfer(totalAmount);
+        } else {
+            // ERC20 token
+            IERC20(deposit.currency).safeTransfer(msg.sender, totalAmount);
+        }
+
+        // Record yield snapshot
+        yieldHistory[gameId].push(YieldSnapshot({
+            timestamp: block.timestamp,
+            totalYield: yieldAccumulated,
+            apy: protocol.currentAPY
+        }));
+
+        emit YieldWithdrawnToContract(gameId, principal, yieldAccumulated, totalAmount, msg.sender);
+    }
+
     // ============ Internal Functions ============
 
-    /**
-     * @notice Calculate shares from deposit amount
-     */
+  
     function _calculateShares(
         uint256 amount,
         address asset,
@@ -447,18 +531,29 @@ contract YieldVault is IYieldVault, Ownable, ReentrancyGuard {
         uint256 shares,
         uint8 protocol
     ) internal {
-        gameDeposits[gameId] = GameDeposit({
-            gameId: gameId,
-            currency: currency,
-            amount: amount,
-            shares: shares,
-            timestamp: block.timestamp,
-            protocol: protocol,
-            initialAPY: protocols[protocol].currentAPY,
-            active: true
-        });
+        GameDeposit storage deposit = gameDeposits[gameId];
+        
+        // Check if deposit already exists for this gameId with same currency and protocol
+        // Use amount > 0 to detect existing deposit (deposit.amount will be 0 for new deposits)
+        if (deposit.amount > 0 && deposit.currency == currency && deposit.protocol == protocol && deposit.active) {
+            // Accumulate deposits for the same gameId (multiple players depositing to same game)
+            deposit.amount += amount;
+            deposit.shares += shares;
+            // Keep original timestamp for yield calculation (don't update)
+            // Don't update protocol or currency as they should match
+        } else {
+            // New deposit for this gameId or currency/protocol mismatch (shouldn't happen for same game)
+            deposit.gameId = gameId;
+            deposit.currency = currency;
+            deposit.amount = amount;
+            deposit.shares = shares;
+            deposit.timestamp = block.timestamp;
+            deposit.protocol = protocol;
+            deposit.initialAPY = protocols[protocol].currentAPY;
+            deposit.active = true;
+        }
 
-        // Update totals
+        // Update totals (always add to totals, even when accumulating)
         totalValueLocked += amount;
         totalValueLockedByAsset[currency] += amount;
         totalSharesByAsset[currency] += shares;
@@ -534,6 +629,14 @@ contract YieldVault is IYieldVault, Ownable, ReentrancyGuard {
      */
     function setOndoEnabled(bool enabled) external onlyOwner {
         protocols[PROTOCOL_ONDO_USDY].enabled = enabled;
+    }
+
+    /**
+     * @notice Set GameManager address (for controlled withdrawals)
+     */
+    function setGameManager(address _gameManager) external onlyOwner {
+        require(_gameManager != address(0), "Invalid GameManager address");
+        gameManager = _gameManager;
     }
 
     // ============ View Functions ============

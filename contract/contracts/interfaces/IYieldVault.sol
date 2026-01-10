@@ -24,7 +24,15 @@ interface IYieldVault {
     function depositMETH(uint256 gameId, uint256 amount) external returns (uint256 shares);
 
     /**
-     * @notice Deposit native MNT (legacy support)
+     * @notice Deposit native MNT for yield generation
+     * @param gameId Associated game ID
+     * @param amount Amount of MNT to deposit
+     * @return shares Shares received
+     */
+    function depositMNT(uint256 gameId, uint256 amount) external payable returns (uint256 shares);
+
+    /**
+     * @notice Deposit native MNT (legacy support - uses gameId 0)
      * @param amount Amount to deposit
      * @param protocol Protocol identifier (0 = mETH, 1 = USDT0, etc.)
      * @return shares Shares received
@@ -44,6 +52,14 @@ interface IYieldVault {
      * @param winner Winner address
      */
     function distributeYield(uint256 gameId, address winner) external;
+
+    /**
+     * @notice Withdraw principal + yield to calling contract (GameManager) for fee distribution
+     * @param gameId Game ID to withdraw  
+     * @return principal Original deposit amount
+     * @return yieldAccumulated Yield earned on the deposit
+     */
+    function withdrawToContract(uint256 gameId) external returns (uint256 principal, uint256 yieldAccumulated);
 
     /**
      * @notice Emit yield snapshot for a game (for tracking/analytics)
