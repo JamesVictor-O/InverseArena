@@ -234,12 +234,18 @@ contract Matchmaking is Ownable, ReentrancyGuard {
         if (matchedCount >= config.minPlayers) {
             uint256 medianEntryFee = _calculateMedian(entryFees, matchedCount);
             uint256 gameId;
+            
+            // Generate game name based on mode
+            string memory gameName;
             if (mode == GameManager.GameMode.QuickPlay) {
-                gameId = gameManager.createQuickPlayGame{value: 0}(medianEntryFee, matchedCount);
+                gameName = "Quick Play Match";
+                gameId = gameManager.createQuickPlayGame{value: 0}(gameName, medianEntryFee, matchedCount);
             } else if (mode == GameManager.GameMode.Scheduled) {
-                gameId = gameManager.createPrivateRoom(GameManager.Currency.MNT, medianEntryFee, matchedCount);
+                gameName = "Scheduled Tournament";
+                gameId = gameManager.createPrivateRoom(gameName, GameManager.Currency.MNT, medianEntryFee, matchedCount);
             } else {
-                gameId = gameManager.createPrivateRoom(GameManager.Currency.MNT, medianEntryFee, matchedCount);
+                gameName = "Private Room";
+                gameId = gameManager.createPrivateRoom(gameName, GameManager.Currency.MNT, medianEntryFee, matchedCount);
             }
 
             address[] memory playersToRemove = new address[](matchedCount);
