@@ -138,22 +138,91 @@ export function ConnectActionsProvider({
       <EnabledPrivyActionsProvider>{children}</EnabledPrivyActionsProvider>
     );
 
-  const value: ConnectActions = {
-    connectWallet: () => {
-      // UI-only mode: keep it non-blocking but obvious.
-      console.warn(
-        "[connect] Privy is disabled. Set NEXT_PUBLIC_ENABLE_PRIVY=true and configure NEXT_PUBLIC_PRIVY_APP_ID to enable wallet connect."
-      );
+  // Direct wallet connection (MetaMask, etc.) when Privy is disabled
+  return <DirectWalletProvider>{children}</DirectWalletProvider>;
+}
+
+// Direct wallet provider for MetaMask/injected wallets
+function DirectWalletProvider({ children }: { children: React.ReactNode }) {
+  const [walletAddress, setWalletAddress] = React.useState<string | null>(null);
+  const [isReady, setIsReady] = React.useState(false);
+
+  React.useEffect(() => {
+    // Check if wallet is already connected
+    const checkConnection = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ethereum =
+        typeof window !== "undefined" ? (window as any).ethereum : null;
+      if (ethereum) {
+        try {
+          const accounts = (await ethereum.request({
+            method: "eth_accounts",
+          })) as string[];
+          if (accounts && accounts.length > 0) {
+            setWalletAddress(accounts[0]);
+          }
+        } catch (err) {
+          console.error("Error checking wallet connection:", err);
+        }
+      }
+      setIsReady(true);
+
+      // Listen for account changes
+      if (ethereum) {
+        ethereum.on("accountsChanged", (accounts: string[]) => {
+          if (accounts && accounts.length > 0) {
+            setWalletAddress(accounts[0]);
+          } else {
+            setWalletAddress(null);
+          }
+        });
+      }
+    };
+
+    checkConnection();
+  }, []);
+
+  const connectWallet = React.useCallback(async (): Promise<boolean> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ethereum =
+      typeof window !== "undefined" ? (window as any).ethereum : null;
+    if (!ethereum) {
+      alert("No wallet found. Please install MetaMask or another Web3 wallet.");
       return false;
-    },
-    disconnect: () => {
-      console.warn(
-        "[connect] Privy is disabled. Cannot disconnect."
-      );
-    },
-    isReady: false,
-    isAuthenticated: false,
-    walletAddress: null,
+    }
+
+    try {
+      const accounts = (await ethereum.request({
+        method: "eth_requestAccounts",
+      })) as string[];
+      if (accounts && accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Error connecting wallet:", err);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const error = err as any;
+      if (error.code === 4001) {
+        alert("Please connect your wallet to continue.");
+      } else {
+        alert(`Error connecting wallet: ${error.message || "Unknown error"}`);
+      }
+      return false;
+    }
+  }, []);
+
+  const disconnect = React.useCallback(() => {
+    setWalletAddress(null);
+  }, []);
+
+  const value: ConnectActions = {
+    connectWallet,
+    disconnect,
+    isReady,
+    isAuthenticated: walletAddress !== null,
+    walletAddress,
   };
 
   return (
