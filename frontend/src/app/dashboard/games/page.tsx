@@ -1,5 +1,5 @@
-import GameMarketClient from "@/components/GameMarket/GameMarketClient";
+import { GameList } from "@/components/GameMarket/GameList";
 
 export default function GamesPage() {
-  return <GameMarketClient />;
+  return <GameList />;
 }
