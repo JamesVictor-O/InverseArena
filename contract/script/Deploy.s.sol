@@ -10,70 +10,113 @@ import {Matchmaking} from "../contracts/Matchmaking.sol";
 /**
  * @title DeployScript
  * @notice Deployment script for Inverse Arena contracts
+ * @dev Deploys contracts in the correct order and sets up authorizations
  */
 contract DeployScript is Script {
+    // Deployment addresses (will be populated during deployment)
+    address public yieldVaultAddress;
+    address public nftAchievementsAddress;
+    address public gameManagerAddress;
+    address public matchmakingAddress;
+
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(deployerPrivateKey);
+        
         vm.startBroadcast(deployerPrivateKey);
 
-        console.log("Deploying Inverse Arena contracts...");
-        console.log("Deployer:", vm.addr(deployerPrivateKey));
-        console.log("Using native token (MNT) for all transactions");
+        console.log("========================================");
+        console.log("Inverse Arena Contract Deployment");
+        console.log("========================================");
+        console.log("Deployer:", deployer);
+        console.log("Network: Mantle");
+        console.log("========================================\n");
 
-        // 1. Deploy YieldVault
-        // Note: For Mantle Sepolia testnet, you can either:
-        // - Use official token addresses (if available)
-        // - Deploy mock tokens first using DeployMockTokens.s.sol
+        // Load configuration from environment
         address usdt0 = vm.envOr("USDT0_ADDRESS", address(0)); 
         address mETH = vm.envOr("METH_ADDRESS", address(0)); 
-        address aavePool = vm.envOr("AAVE_POOL_ADDRESS", address(0)); // Can be zero for initial deployment
+        address aavePool = vm.envOr("AAVE_POOL_ADDRESS", address(0)); // Optional
         address mnt = address(0); // Native MNT
         
+        // Validate required addresses
         require(usdt0 != address(0), "USDT0_ADDRESS not set in .env");
         require(mETH != address(0), "METH_ADDRESS not set in .env");
         
-        console.log("\n1. Deploying YieldVault...");
+        console.log("Configuration:");
+        console.log("  USDT0:", usdt0);
+        console.log("  mETH:", mETH);
+        console.log("  Aave Pool:", aavePool != address(0) ? vm.toString(aavePool) : "Not configured");
+        console.log("  Native MNT: Native token\n");
+
+        // 1. Deploy YieldVault
+        console.log("Step 1/4: Deploying YieldVault...");
         YieldVault yieldVault = new YieldVault(usdt0, mETH, aavePool, mnt);
-        console.log("YieldVault deployed at:", address(yieldVault));
+        yieldVaultAddress = address(yieldVault);
+        console.log("  [OK] YieldVault deployed at:", yieldVaultAddress);
 
         // 2. Deploy NFTAchievements
-        console.log("\n2. Deploying NFTAchievements...");
+        console.log("\nStep 2/4: Deploying NFTAchievements...");
         NFTAchievements nftAchievements = new NFTAchievements();
-        console.log("NFTAchievements deployed at:", address(nftAchievements));
+        nftAchievementsAddress = address(nftAchievements);
+        console.log("  [OK] NFTAchievements deployed at:", nftAchievementsAddress);
 
         // 3. Deploy GameManager
-        // Note: Using block-based randomness (no VRF needed for Mantle)
-        console.log("\n3. Deploying GameManager...");
+        console.log("\nStep 3/4: Deploying GameManager...");
+        console.log("  Note: Using block-based randomness (no VRF needed)");
         GameManager gameManager = new GameManager(
-            address(yieldVault),
-            address(nftAchievements),
+            yieldVaultAddress,
+            nftAchievementsAddress,
             usdt0,
             mETH
         );
-        console.log("GameManager deployed at:", address(gameManager));
+        gameManagerAddress = address(gameManager);
+        console.log("  [OK] GameManager deployed at:", gameManagerAddress);
 
         // 4. Deploy Matchmaking
-        console.log("\n4. Deploying Matchmaking...");
-        Matchmaking matchmaking = new Matchmaking(address(gameManager));
-        console.log("Matchmaking deployed at:", address(matchmaking));
+        console.log("\nStep 4/4: Deploying Matchmaking...");
+        Matchmaking matchmaking = new Matchmaking(gameManagerAddress);
+        matchmakingAddress = address(matchmaking);
+        console.log("  [OK] Matchmaking deployed at:", matchmakingAddress);
 
-        // 5. Set up authorizations
-        console.log("\n5. Setting up authorizations...");
+        // 5. Set up authorizations and configurations
+        console.log("\nSetting up authorizations and configurations...");
+        
+        // Set GameManager address in YieldVault (required for withdrawToContract)
+        yieldVault.setGameManager(gameManagerAddress);
+        console.log("  [OK] GameManager address set in YieldVault");
         
         // Authorize GameManager to mint achievements
-        nftAchievements.setAuthorizedMinter(address(gameManager), true);
-        console.log("GameManager authorized to mint achievements");
+        nftAchievements.setAuthorizedMinter(gameManagerAddress, true);
+        console.log("  [OK] GameManager authorized to mint achievements");
         
-        // Transfer ownership of contracts to deployer (already owned, but ensure)
-        // The contracts are already owned by deployer, so this is just for verification
-        console.log("Contract ownership verified");
+        // Verify authorization
+        // Note: We can't easily check this in the script, but it will revert if it fails
+        
+        // Verify contract ownership
+        require(yieldVault.owner() == deployer, "YieldVault ownership mismatch");
+        require(nftAchievements.owner() == deployer, "NFTAchievements ownership mismatch");
+        require(gameManager.owner() == deployer, "GameManager ownership mismatch");
+        require(matchmaking.owner() == deployer, "Matchmaking ownership mismatch");
+        console.log("  [OK] All contracts owned by deployer");
+        
+        // Verify GameManager is set in YieldVault
+        require(yieldVault.gameManager() == gameManagerAddress, "GameManager address not set correctly in YieldVault");
+        console.log("  [OK] GameManager address verified in YieldVault");
 
-        console.log("\n=== Deployment Summary ===");
-        console.log("YieldVault:", address(yieldVault));
-        console.log("NFTAchievements:", address(nftAchievements));
-        console.log("GameManager:", address(gameManager));
-        console.log("Matchmaking:", address(matchmaking));
-        console.log("\nNote: Using native Mantle token (MNT) for all game transactions");
+        // Print deployment summary
+        console.log("\n========================================");
+        console.log("Deployment Summary");
+        console.log("========================================");
+        console.log("YieldVault:        ", yieldVaultAddress);
+        console.log("NFTAchievements:   ", nftAchievementsAddress);
+        console.log("GameManager:       ", gameManagerAddress);
+        console.log("Matchmaking:        ", matchmakingAddress);
+        console.log("========================================");
+        console.log("\nNext Steps:");
+        console.log("1. Verify contracts on block explorer");
+        console.log("2. Update frontend .env with contract addresses");
+        console.log("3. Test contract interactions");
+        console.log("4. Configure yield protocols if needed\n");
 
         vm.stopBroadcast();
     }
