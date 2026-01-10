@@ -1,15 +1,10 @@
-/**
- * Contract addresses and configuration for Inverse Arena
- * Updated after deployment to Mantle Sepolia Testnet
- */
 
-// Deployed contract addresses (Mantle Sepolia Testnet)
 export const CONTRACT_ADDRESSES = {
   // Core contracts
-  YIELD_VAULT: "0x15B9E263B6E896d4D8F0D9c89878678aa6abAdeC",
-  NFT_ACHIEVEMENTS: "0x0115CA8539906db2d9a4beE36C64eA94a0d7Fa31",
-  GAME_MANAGER: "0x284991966A8256521e72470E3B92E03E8aB8c1C3",
-  MATCHMAKING: "0xd4B7fCecE89ABE7cAEd26aB34b548465ae05eE1B",
+  YIELD_VAULT: "0xB47E02e88d10751Ca6FA79EbcD85fAd4a619a815",
+  NFT_ACHIEVEMENTS: "0x3ff2eba8f98587a20a49805bfc2bf5d220a77611",
+  GAME_MANAGER: "0x495989595bb1a6c3a6acd2b36a91a0739154fb6b",
+  MATCHMAKING: "0xea395fb4831028a3ad91a106281f5f8284cbabda",
 
   // Token addresses (from deployment)
   USDT0: "0xc2B0D2A7e858F13B349843fF87dBF4EBF9227F49", // Mock USDT0
@@ -43,3 +38,4 @@ export const getContractAddresses = () => {
     METH: process.env.NEXT_PUBLIC_METH_ADDRESS || CONTRACT_ADDRESSES.METH,
   };
 };
+
