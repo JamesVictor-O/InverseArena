@@ -4,6 +4,8 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/Dashboard/Icon";
 import { useConnectActions } from "@/components/Connect/ConnectActions";
+import { useGameManager } from "@/hooks/useGameManager";
+import { Currency } from "@/lib/contract-types";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = React.useState(false);
@@ -40,10 +42,97 @@ export function DashboardHeader() {
   const isDesktop = useIsDesktop();
   const { walletAddress } = useConnectActions();
   const { title, subtitle } = getPageTitle(pathname);
-  
-  // Mock balance - replace with real data later
-  // TODO: Fetch actual USDT0/MNT balance from contract
-  const balance = walletAddress ? "2,450.00 USDT0" : "0.00 USDT0";
+  const { getTokenBalance } = useGameManager();
+
+  const [balance, setBalance] = React.useState<string>("0.00 USDT0");
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  // Fetch USDT0 balance when wallet is connected
+  React.useEffect(() => {
+    if (!walletAddress) {
+      setBalance("0.00 USDT0");
+      setIsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    let intervalId: NodeJS.Timeout | null = null;
+    let isFirstFetch = true;
+
+    const fetchBalance = async (isInitial = false) => {
+      // Only show loading on initial fetch
+      if (isInitial) {
+        setIsLoading(true);
+      }
+
+      try {
+        const tokenBalance = await getTokenBalance(Currency.USDT0);
+
+        if (!cancelled) {
+          // Format balance with commas and appropriate decimal places
+          const balanceNum = parseFloat(tokenBalance);
+
+          // Use more decimal places for very small balances
+          let formattedBalance: string;
+          if (balanceNum === 0) {
+            formattedBalance = "0.00";
+          } else if (balanceNum < 0.01) {
+            // For very small balances, show more precision
+            formattedBalance = balanceNum.toLocaleString("en-US", {
+              minimumFractionDigits: 4,
+              maximumFractionDigits: 6,
+            });
+          } else if (balanceNum < 1) {
+            formattedBalance = balanceNum.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 4,
+            });
+          } else {
+            // For larger balances, standard 2 decimal places
+            formattedBalance = balanceNum.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+          }
+
+          setBalance(`${formattedBalance} USDT0`);
+        }
+      } catch (error) {
+        console.error("Error fetching USDT0 balance:", error);
+        // Don't reset to 0.00 on error - keep showing previous balance
+        // This prevents flickering when there's a temporary network issue
+        if (!cancelled && isFirstFetch) {
+          // Only show error message on first failed fetch
+          setBalance("Error");
+        }
+      } finally {
+        if (!cancelled && isInitial) {
+          setIsLoading(false);
+          isFirstFetch = false;
+        }
+      }
+    };
+
+    // Initial fetch with a small delay to ensure wallet is ready
+    const timeoutId = setTimeout(() => {
+      fetchBalance(true); // Pass true for initial fetch
+
+      // Refresh balance every 10 seconds (silently, without loading state)
+      intervalId = setInterval(() => {
+        if (walletAddress && !cancelled) {
+          fetchBalance(false); // Pass false for subsequent fetches
+        }
+      }, 10000);
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [walletAddress, getTokenBalance]);
 
   if (isDesktop) {
     return (
@@ -62,7 +151,7 @@ export function DashboardHeader() {
             <Icon name="account_balance_wallet" className="text-[18px]" />
           </div>
           <span className="text-sm font-bold tracking-wide text-white">
-            {balance}
+            {isLoading ? "..." : balance}
           </span>
         </div>
       </header>
@@ -98,7 +187,7 @@ export function DashboardHeader() {
             <Icon name="account_balance_wallet" className="text-[16px]" />
           </div>
           <span className="text-sm font-bold tracking-wide text-white">
-            {balance}
+            {isLoading ? "..." : balance}
           </span>
         </div>
       </div>
