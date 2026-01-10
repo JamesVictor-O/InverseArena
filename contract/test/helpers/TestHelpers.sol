@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {GameManager} from "../../contracts/GameManager.sol";
 import {YieldVault} from "../../contracts/YieldVault.sol";
 import {NFTAchievements} from "../../contracts/NFTAchievements.sol";
@@ -10,10 +10,9 @@ import {MockERC20} from "../mocks/MockERC20.sol";
 
 /**
  * @title TestHelpers
- * @notice Helper contract for setting up test environment
+ * @notice Helper contract with common test utilities for GameManager tests
  */
 contract TestHelpers is Test {
-    // Contracts
     GameManager public gameManager;
     YieldVault public yieldVault;
     NFTAchievements public nftAchievements;
@@ -21,48 +20,39 @@ contract TestHelpers is Test {
     MockERC20 public usdt0;
     MockERC20 public mETH;
 
-    // Test addresses
-    address public owner = address(1);
-    address public player1 = address(2);
-    address public player2 = address(3);
-    address public player3 = address(4);
-    address public player4 = address(5);
-    address public player5 = address(6);
-    address public player6 = address(7);
-    address public player7 = address(8);
-    address public player8 = address(9);
+    address public owner;
+    address public player1;
+    address public player2;
+    address public player3;
+    address public player4;
+    address public player5;
 
-    // Constants
-    uint256 public constant ENTRY_FEE = 0.01 ether;
     uint256 public constant MIN_PLAYERS = 4;
-    uint256 public constant MAX_PLAYERS = 20;
-
-    // Events
-    event GameCreated(uint256 indexed gameId, address indexed creator, GameManager.GameMode mode);
-    event PlayerJoined(uint256 indexed gameId, address indexed player);
-    event ChoiceMade(uint256 indexed gameId, address indexed player, GameManager.Choice choice);
-    event RoundProcessed(uint256 indexed gameId, uint256 roundNumber, GameManager.Choice winningChoice);
-    event GameCompleted(uint256 indexed gameId, address indexed winner, uint256 prizePool, uint256 yield);
+    uint256 public constant MIN_CREATOR_STAKE = 30 * 10**6; // 30 USDT (6 decimals)
 
     function setUp() public virtual {
-        vm.startPrank(owner);
+        // Set up test addresses
+        // Note: Avoid addresses 0x1-0x9 (precompiles) which can't be used for regular transactions
+        owner = address(this);
+        player1 = address(0x10);
+        player2 = address(0x11);
+        player3 = address(0x12);
+        player4 = address(0x13);
+        player5 = address(0x14);
 
         // Deploy mock tokens
-        usdt0 = new MockERC20("USDT0", "USDT0", 6);
-        mETH = new MockERC20("mETH", "mETH", 18);
+        usdt0 = new MockERC20("Mock USDT0", "USDT0", 6);
+        mETH = new MockERC20("Mock mETH", "mETH", 18);
 
-        // Deploy YieldVault
+        // Deploy core contracts
+        nftAchievements = new NFTAchievements();
         yieldVault = new YieldVault(
             address(usdt0),
             address(mETH),
-            address(0), // aavePool
-            address(0)  // MNT (native)
+            address(0), // lendle
+            address(0)  // aurelius
         );
-
-        // Deploy NFTAchievements
-        nftAchievements = new NFTAchievements();
-
-        // Deploy GameManager (no VRF needed - uses block-based randomness)
+        
         gameManager = new GameManager(
             address(yieldVault),
             address(nftAchievements),
@@ -70,91 +60,103 @@ contract TestHelpers is Test {
             address(mETH)
         );
 
+        // Deploy Matchmaking contract
+        matchmaking = new Matchmaking(address(gameManager));
+
+        // Set GameManager in YieldVault
+        yieldVault.setGameManager(address(gameManager));
+
         // Authorize GameManager to mint NFTs
         nftAchievements.setAuthorizedMinter(address(gameManager), true);
 
-        // Deploy Matchmaking
-        matchmaking = new Matchmaking(address(gameManager));
-
-        vm.stopPrank();
-
-        // Fund test accounts with native tokens
-        vm.deal(player1, 100 ether);
-        vm.deal(player2, 100 ether);
-        vm.deal(player3, 100 ether);
-        vm.deal(player4, 100 ether);
-        vm.deal(player5, 100 ether);
-        vm.deal(player6, 100 ether);
-        vm.deal(player7, 100 ether);
-        vm.deal(player8, 100 ether);
-
-        // Fund test accounts with ERC20 tokens
-        // USDT0 uses 6 decimals
-        // Contract requires entryFee >= 10^15 (MIN_ENTRY_FEE) in raw units
-        // So we need at least 10^15 USDT0 units per game
-        // Mint enough for many games: 100 * 10^15 = 100,000,000,000,000,000 USDT0 units
-        uint256 usdt0Amount = 100 * 10**15; // 100 games worth
-        usdt0.mint(player1, usdt0Amount);
-        usdt0.mint(player2, usdt0Amount);
-        usdt0.mint(player3, usdt0Amount);
-        usdt0.mint(player4, usdt0Amount);
-        usdt0.mint(player5, usdt0Amount);
-        usdt0.mint(player6, usdt0Amount);
-        usdt0.mint(player7, usdt0Amount);
-        usdt0.mint(player8, usdt0Amount);
-        usdt0.mint(player2, 1000 * 10**6);
-        usdt0.mint(player3, 1000 * 10**6);
-        usdt0.mint(player4, 1000 * 10**6);
-        usdt0.mint(player5, 1000 * 10**6);
-        usdt0.mint(player6, 1000 * 10**6);
-        usdt0.mint(player7, 1000 * 10**6);
-        usdt0.mint(player8, 1000 * 10**6);
-
-        mETH.mint(player1, 1000 * 10**18);
-        mETH.mint(player2, 1000 * 10**18);
-        mETH.mint(player3, 1000 * 10**18);
-        mETH.mint(player4, 1000 * 10**18);
-        mETH.mint(player5, 1000 * 10**18);
-        mETH.mint(player6, 1000 * 10**18);
-        mETH.mint(player7, 1000 * 10**18);
-        mETH.mint(player8, 1000 * 10**18);
+        // Fund test accounts with tokens and ETH
+        _fundAccount(player1);
+        _fundAccount(player2);
+        _fundAccount(player3);
+        _fundAccount(player4);
+        _fundAccount(player5);
     }
 
-    // Note: VRF removed - randomness is now block-based and processed immediately
+    /**
+     * @notice Fund an account with test tokens and ETH
+     * @param account Address to fund
+     */
+    function _fundAccount(address account) internal {
+        // Give ETH for gas and MNT games
+        vm.deal(account, 100 ether);
+        
+        // Give USDT0 tokens
+        usdt0.mint(account, 1000000 * 10**6); // 1M USDT0
+        
+        // Give mETH tokens
+        mETH.mint(account, 1000 ether); // 1000 mETH
+    }
 
     /**
-     * @notice Helper to create a game and get players to minimum
-     * @dev For USDT0, entryFee should be in USDT0's native units (6 decimals)
-     *      For MNT/mETH, entryFee should be in wei (18 decimals)
+     * @notice Helper to stake as creator for testing
+     * @param creator Address to stake for
+     */
+    function stakeAsCreatorFor(address creator) internal {
+        vm.startPrank(creator);
+        
+        // Approve USDT0 for staking
+        usdt0.approve(address(gameManager), MIN_CREATOR_STAKE);
+        
+        // Stake to become creator
+        gameManager.stakeAsCreator(MIN_CREATOR_STAKE);
+        
+        vm.stopPrank();
+    }
+
+    /**
+     * @notice Create a game with minimum players already joined and started
+     * @param currency The currency to use for the game
+     * @param entryFee Entry fee amount
+     * @param maxPlayers Maximum players for the game
+     * @return gameId The created game ID
      */
     function createGameWithMinPlayers(
         GameManager.Currency currency,
         uint256 entryFee,
         uint256 maxPlayers
-    ) internal returns (uint256 gameId) {
-        address[] memory players = new address[](MIN_PLAYERS);
-        players[0] = player1;
-        players[1] = player2;
-        players[2] = player3;
-        players[3] = player4;
+    ) internal returns (uint256) {
+        // Stake as creator for player1
+        stakeAsCreatorFor(player1);
 
+        uint256 gameId;
+
+        // Create game with player1
         if (currency == GameManager.Currency.MNT) {
             vm.prank(player1);
-            gameId = gameManager.createQuickPlayGame{value: entryFee}(entryFee, maxPlayers);
+            gameId = gameManager.createQuickPlayGame{value: entryFee}(
+                "Test Game",
+                entryFee,
+                maxPlayers
+            );
         } else if (currency == GameManager.Currency.USDT0) {
             vm.startPrank(player1);
             usdt0.approve(address(gameManager), entryFee);
-            gameId = gameManager.createQuickPlayGameUSDT0(entryFee, maxPlayers);
+            gameId = gameManager.createQuickPlayGameUSDT0(
+                "Test Game USDT0",
+                entryFee,
+                maxPlayers
+            );
             vm.stopPrank();
         } else if (currency == GameManager.Currency.METH) {
             vm.startPrank(player1);
             mETH.approve(address(gameManager), entryFee);
-            gameId = gameManager.createQuickPlayGameMETH(entryFee, maxPlayers);
+            gameId = gameManager.createQuickPlayGameMETH(
+                "Test Game METH",
+                entryFee,
+                maxPlayers
+            );
             vm.stopPrank();
         }
 
-        // Join remaining players
-        for (uint256 i = 1; i < MIN_PLAYERS; i++) {
+        // Join with remaining players to reach minimum
+        address[3] memory players = [player2, player3, player4];
+        
+        for (uint256 i = 0; i < MIN_PLAYERS - 1; i++) {
             if (currency == GameManager.Currency.MNT) {
                 vm.prank(players[i]);
                 gameManager.joinGame{value: entryFee}(gameId);
@@ -171,6 +173,103 @@ contract TestHelpers is Test {
             }
         }
 
+        // ✅ New logic: After min players join, countdown starts
+        // Fast forward past countdown and start the game
+        (, , GameManager.GameStatus status, , , , , , , , ,) = gameManager.getGame(gameId);
+        if (status == GameManager.GameStatus.Countdown) {
+            // Fast forward 1 minute + 1 second past countdown deadline
+            vm.warp(block.timestamp + 61 seconds);
+            // Start the game after countdown (anyone can call this)
+            gameManager.startGameAfterCountdown(gameId);
+        }
+
         return gameId;
+    }
+
+    /**
+     * @notice Helper to create a game with min players and start it (maintains backward compatibility)
+     * @param currency The currency to use for the game
+     * @param entryFee Entry fee amount
+     * @param maxPlayers Maximum players for the game
+     * @return gameId The created game ID (in InProgress state)
+     */
+    function createAndStartGame(
+        GameManager.Currency currency,
+        uint256 entryFee,
+        uint256 maxPlayers
+    ) internal returns (uint256) {
+        return createGameWithMinPlayers(currency, entryFee, maxPlayers);
+    }
+
+    /**
+     * @notice Helper to create a complete game scenario with choices made
+     * @param currency Currency to use
+     * @param entryFee Entry fee amount
+     * @param headChoices Number of players choosing Head (rest choose Tail)
+     * @return gameId The created game ID
+     */
+    function createGameWithChoices(
+        GameManager.Currency currency,
+        uint256 entryFee,
+        uint256 headChoices
+    ) internal returns (uint256) {
+        require(headChoices <= MIN_PLAYERS, "Too many head choices");
+        
+        uint256 gameId = createGameWithMinPlayers(currency, entryFee, 10);
+        
+        address[4] memory players = [player1, player2, player3, player4];
+        
+        // Make choices
+        for (uint256 i = 0; i < MIN_PLAYERS; i++) {
+            GameManager.Choice choice = i < headChoices 
+                ? GameManager.Choice.Head 
+                : GameManager.Choice.Tail;
+                
+            vm.prank(players[i]);
+            gameManager.makeChoice(gameId, choice);
+        }
+        
+        return gameId;
+    }
+
+    /**
+     * @notice Get active (non-eliminated) player count for a game
+     * @param gameId Game ID to check
+     * @return count Number of active players
+     */
+    function getActivePlayerCount(uint256 gameId) internal view returns (uint256) {
+        address[] memory players = gameManager.getGamePlayers(gameId);
+        uint256 count = 0;
+        
+        for (uint256 i = 0; i < players.length; i++) {
+            GameManager.PlayerInfo memory info = gameManager.getPlayerInfo(gameId, players[i]);
+            if (!info.eliminated) {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+
+    /**
+     * @notice Assert that a player is eliminated
+     * @param gameId Game ID
+     * @param player Player address
+     */
+    function assertPlayerEliminated(uint256 gameId, address player) internal view {
+        GameManager.PlayerInfo memory info = gameManager.getPlayerInfo(gameId, player);
+        assertTrue(info.eliminated, "Player should be eliminated");
+        assertGt(info.roundEliminated, 0, "Round eliminated should be set");
+    }
+
+    /**
+     * @notice Assert that a player is still active
+     * @param gameId Game ID
+     * @param player Player address
+     */
+    function assertPlayerActive(uint256 gameId, address player) internal view {
+        GameManager.PlayerInfo memory info = gameManager.getPlayerInfo(gameId, player);
+        assertFalse(info.eliminated, "Player should be active");
+        assertEq(info.roundEliminated, 0, "Round eliminated should be 0");
     }
 }
