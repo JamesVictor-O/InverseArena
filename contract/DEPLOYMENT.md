@@ -3,12 +3,14 @@
 ## Prerequisites
 
 1. **Install Foundry**
+
    ```bash
    curl -L https://foundry.paradigm.xyz | bash
    foundryup
    ```
 
 2. **Setup Environment Variables**
+
    ```bash
    cp .env.example .env
    # Edit .env with your actual values
@@ -39,6 +41,7 @@ AAVE_POOL_ADDRESS=0x0000000000000000000000000000000000000000  # Can be zero for 
 4. Get the coordinator address and key hash from [Chainlink docs](https://docs.chain.link/vrf/v2/subscription/supported-networks)
 
 Update your `.env` file:
+
 ```bash
 VRF_COORDINATOR=0x...  # Chainlink VRF Coordinator address on Mantle Testnet
 VRF_SUBSCRIPTION_ID=1  # Your subscription ID
@@ -78,6 +81,7 @@ npm run deploy:testnet
 ### 4. Deployment Order
 
 The script automatically deploys in the correct order:
+
 1. **YieldVault** - Manages yield generation
 2. **NFTAchievements** - NFT achievement system
 3. **GameManager** - Core game logic
@@ -88,6 +92,7 @@ The script automatically deploys in the correct order:
 After deployment, you need to:
 
 1. **Authorize GameManager to mint achievements:**
+
    ```bash
    # This is done automatically in the deployment script
    # But you can verify with:
@@ -152,6 +157,7 @@ forge script script/Deploy.s.sol:DeployScript \
 ```
 
 Or use npm script:
+
 ```bash
 npm run deploy:mainnet
 ```
@@ -161,15 +167,18 @@ npm run deploy:mainnet
 ### Common Issues
 
 1. **Insufficient Balance**
+
    - Ensure your wallet has enough MNT for gas fees
    - Check account balance: `cast balance $DEPLOYER_ADDRESS --rpc-url mantle_testnet`
 
 2. **VRF Configuration**
+
    - Verify VRF subscription is funded with LINK
    - Check coordinator address is correct for Mantle
    - Ensure subscription ID is correct
 
 3. **Token Addresses**
+
    - Verify token addresses are correct for the network
    - For testnet, you may need to deploy mock tokens first
 
@@ -181,16 +190,19 @@ npm run deploy:mainnet
 ## Next Steps After Deployment
 
 1. **Update Frontend Configuration**
+
    - Update contract addresses in frontend `.env`
    - Update network configuration
    - Test contract interactions
 
 2. **Setup Monitoring**
+
    - Add contract addresses to monitoring tools
    - Setup event listeners
    - Configure alerts
 
 3. **Security Audit**
+
    - Review deployed contracts
    - Check access controls
    - Verify emergency functions
