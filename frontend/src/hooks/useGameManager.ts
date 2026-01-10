@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import { ethers } from "ethers";
-import { usePrivy } from "@privy-io/react-auth";
 import { getContractConfig } from "@/lib/contracts-client";
 import { Currency, CURRENCY_INFO } from "@/lib/contract-types";
 import { getContractAddresses } from "@/lib/contracts";
@@ -12,7 +11,6 @@ import {
   MANTLE_SEPOLIA,
 } from "@/lib/network";
 
-// ERC20 ABI for token approvals
 const IERC20_ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
   "function allowance(address owner, address spender) external view returns (uint256)",
@@ -68,7 +66,6 @@ export function useGameManager(): UseGameManagerReturn {
       );
     }
 
-    // Request account access if needed
     try {
       await ethereum.request({ method: "eth_requestAccounts" });
     } catch (err) {
@@ -419,16 +416,43 @@ export function useGameManager(): UseGameManagerReturn {
         if (maxPlayers < 4 || maxPlayers > 20) {
           throw new Error("Max players must be between 4 and 20");
         }
-
-        // Convert entry fee to token units (for balance check and approval)
+        // IMPORTANT: Contract expects USDT0 entry fees in 6 decimals, not 18!
+        // Use explicit decimals to match contract constants
+        const entryFeeDecimals = currency === Currency.USDT0 ? 6 : 18;
         const entryFeeTokenUnits = ethers.parseUnits(
           entryFee.toString(),
-          currencyInfo.decimals
+          entryFeeDecimals
         );
 
-        // Convert entry fee to 18 decimals (wei) for contract validation
-        // The contract expects entry fees in 18-decimal format regardless of token decimals
-        const entryFeeWei = ethers.parseUnits(entryFee.toString(), 18);
+        console.log(
+          `Entry fee conversion: ${entryFee} ${
+            currencyInfo.symbol
+          } -> ${entryFeeTokenUnits.toString()} (using ${entryFeeDecimals} decimals)`
+        );
+
+        // Validate entry fee range - use explicit decimals to match contract
+        const minEntryFee =
+          currency === Currency.USDT0
+            ? ethers.parseUnits("1", 6) // MIN_ENTRY_FEE_USDT0 = 1 * 10^6
+            : ethers.parseUnits("0.001", 18); // MIN_ENTRY_FEE_METH/MNT = 0.001 ether
+        const maxEntryFee =
+          currency === Currency.USDT0
+            ? ethers.parseUnits("100000", 6) // MAX_ENTRY_FEE_USDT0 = 100000 * 10^6
+            : ethers.parseUnits("100", 18); // MAX_ENTRY_FEE_METH/MNT = 100 ether
+
+        if (
+          entryFeeTokenUnits < minEntryFee ||
+          entryFeeTokenUnits > maxEntryFee
+        ) {
+          throw new Error(
+            `Entry fee must be between ${ethers.formatUnits(
+              minEntryFee,
+              currencyInfo.decimals
+            )} and ${ethers.formatUnits(maxEntryFee, currencyInfo.decimals)} ${
+              currencyInfo.symbol
+            }`
+          );
+        }
 
         // Check and approve token if needed (for ERC20 tokens)
         // Approval must be in token's native decimals
@@ -448,36 +472,50 @@ export function useGameManager(): UseGameManagerReturn {
         const gameName = params.name || "Quick Play Game";
 
         let tx: ethers.ContractTransactionResponse;
-
-        // Call the appropriate create function based on currency
-        // Note: Contract expects entryFee in 18-decimal format for validation,
-        // but the actual transfer will use the token's native decimals internally
         if (currency === Currency.MNT) {
-          // Native MNT - use createQuickPlayGame
-          // For MNT, entryFeeWei and entryFeeTokenUnits are the same (both 18 decimals)
           tx = await gameManager.createQuickPlayGame(
             gameName,
-            entryFeeWei,
+            entryFeeTokenUnits,
             maxPlayers,
             {
-              value: entryFeeTokenUnits, // msg.value must be in wei (18 decimals)
+              value: entryFeeTokenUnits,
             }
           );
         } else if (currency === Currency.USDT0) {
           // USDT0 - use createQuickPlayGameUSDT0
-          // Contract expects entryFee in 18 decimals for validation (MIN_ENTRY_FEE check)
-          // But will transfer entryFeeTokenUnits (6 decimals) from the user's wallet
+          // Contract expects entryFee in 6 decimals (USDT0's native decimals)
+          // MIN_ENTRY_FEE_USDT0 = 1 * 10^6, MAX_ENTRY_FEE_USDT0 = 100000 * 10^6
+          console.log(`Creating USDT0 game:`);
+          console.log(`  Entry fee (human readable): ${entryFee} USDT0`);
+          console.log(`  Currency decimals: ${currencyInfo.decimals}`);
+          console.log(
+            `  Entry fee token units (6 decimals): ${entryFeeTokenUnits.toString()}`
+          );
+          console.log(
+            `  Should be: ${entryFee * 10 ** 6} (${entryFee} * 10^6)`
+          );
+          console.log(`  Max players: ${maxPlayers}`);
+
+          // Verify the conversion is correct
+          const expectedValue = BigInt(Math.floor(entryFee * 10 ** 6));
+          if (entryFeeTokenUnits !== expectedValue) {
+            console.error(
+              `WARNING: Entry fee conversion mismatch! Expected ${expectedValue}, got ${entryFeeTokenUnits}`
+            );
+            throw new Error(
+              `Entry fee conversion error. Expected ${expectedValue} (6 decimals), got ${entryFeeTokenUnits}`
+            );
+          }
+
           tx = await gameManager.createQuickPlayGameUSDT0(
             gameName,
-            entryFeeWei, // 18 decimals for validation
+            entryFeeTokenUnits, // MUST be in 6 decimals for USDT0
             maxPlayers
           );
         } else if (currency === Currency.METH) {
-          // mETH - use createQuickPlayGameMETH
-          // mETH has 18 decimals, so entryFeeWei and entryFeeTokenUnits are the same
           tx = await gameManager.createQuickPlayGameMETH(
             gameName,
-            entryFeeWei,
+            entryFeeTokenUnits,
             maxPlayers
           );
         } else {
@@ -556,10 +594,24 @@ export function useGameManager(): UseGameManagerReturn {
           currencyInfo.decimals
         );
 
-        // Check and approve USDT0 if needed
-        const approved = await checkAndApproveToken(Currency.USDT0, amount);
-        if (!approved) {
-          throw new Error("Token approval failed or was rejected.");
+        // Validate minimum stake (30 USDT0 = 30 * 10^6)
+        const MIN_STAKE = 30 * 10 ** 6;
+        if (amountTokenUnits < BigInt(MIN_STAKE)) {
+          throw new Error(
+            `Minimum stake is 30 USDT0. You tried to stake ${amount} USDT0.`
+          );
+        }
+
+        // Check if contract is paused
+        try {
+          const isPaused = await gameManager.paused();
+          if (isPaused) {
+            throw new Error(
+              "Contract is currently paused. Please try again later."
+            );
+          }
+        } catch (err) {
+          console.warn("Could not check pause status:", err);
         }
 
         // Check balance
@@ -570,21 +622,207 @@ export function useGameManager(): UseGameManagerReturn {
           );
         }
 
-        // Call stakeAsCreator function (using function call instead of method)
-        const tx = await gameManager["stakeAsCreator(uint256)"](amountTokenUnits);
-        console.log("Stake transaction submitted:", tx.hash);
+        // Check and approve USDT0 if needed
+        const approved = await checkAndApproveToken(Currency.USDT0, amount);
+        if (!approved) {
+          throw new Error("Token approval failed or was rejected.");
+        }
 
-        // Wait for transaction confirmation
-        const receipt = await tx.wait();
-        console.log("Stake transaction confirmed:", receipt);
+        // Verify approval was set correctly
+        const tokenContract = new ethers.Contract(
+          addresses.USDT0,
+          IERC20_ABI,
+          signer
+        );
+        const userAddress = await signer.getAddress();
+        const allowance = await tokenContract.allowance(
+          userAddress,
+          gameManagerConfig.address
+        );
 
-        return true;
+        console.log(
+          `Allowance check: ${ethers.formatUnits(
+            allowance,
+            currencyInfo.decimals
+          )} USDT0, Required: ${amount} USDT0`
+        );
+
+        if (BigInt(allowance) < BigInt(amountTokenUnits)) {
+          throw new Error(
+            `Insufficient allowance. Approved: ${ethers.formatUnits(
+              allowance,
+              currencyInfo.decimals
+            )} USDT0, Required: ${amount} USDT0. Please approve more tokens.`
+          );
+        }
+
+        // Verify GameManager's USDT0 address matches
+        const contractUSDT0 = await gameManager.USDT0();
+        if (contractUSDT0.toLowerCase() !== addresses.USDT0.toLowerCase()) {
+          throw new Error(
+            `USDT0 address mismatch. Contract: ${contractUSDT0}, Expected: ${addresses.USDT0}`
+          );
+        }
+
+        // Check if YieldVault USDT0 protocol is enabled
+        try {
+          const yieldVaultConfig = getContractConfig("YieldVault");
+          const yieldVault = new ethers.Contract(
+            yieldVaultConfig.address,
+            yieldVaultConfig.abi,
+            signer.provider
+          );
+
+          // PROTOCOL_USDT0 = 1 (check YieldVault for protocol enum)
+          const protocolInfo = await yieldVault.protocols(1); // PROTOCOL_USDT0 = 1
+          if (!protocolInfo.enabled) {
+            throw new Error(
+              "USDT0 protocol is disabled in YieldVault. Please contact the contract owner to enable it."
+            );
+          }
+          console.log("USDT0 protocol is enabled in YieldVault ✓");
+          console.log(
+            `Protocol info: ${JSON.stringify({
+              name: protocolInfo.name,
+              enabled: protocolInfo.enabled,
+              address: protocolInfo.protocolAddress,
+            })}`
+          );
+        } catch (vaultError: any) {
+          if (vaultError.message && vaultError.message.includes("disabled")) {
+            throw vaultError;
+          }
+          console.warn(
+            "Could not check YieldVault protocol status:",
+            vaultError
+          );
+        }
+
+        console.log(
+          `Calling stakeAsCreator with amount: ${amountTokenUnits.toString()} (${amount} USDT0)`
+        );
+        console.log(`GameManager address: ${gameManagerConfig.address}`);
+        console.log(`USDT0 address: ${addresses.USDT0}`);
+        console.log(`Contract USDT0: ${contractUSDT0}`);
+
+        // Estimate gas to catch any revert errors before sending
+        let gasEstimate: bigint;
+        try {
+          console.log("Estimating gas for stakeAsCreator...");
+          gasEstimate = await gameManager.stakeAsCreator.estimateGas(
+            amountTokenUnits
+          );
+          console.log(`Gas estimate: ${gasEstimate.toString()}`);
+        } catch (gasError: unknown) {
+          console.error("Gas estimation failed:", gasError);
+
+          // Try to decode revert reason
+          const err = gasError as {
+            data?: string;
+            reason?: string;
+            message?: string;
+          };
+          if (err.data && err.data !== "0x" && err.data.length > 10) {
+            try {
+             
+              const errorResult = gameManager.interface.parseError(err.data);
+              if (errorResult) {
+                throw new Error(`Transaction will fail: ${errorResult.name}`);
+              }
+
+           
+              const errorSelector = "0x08c379a0";
+              if (err.data.startsWith(errorSelector)) {
+                const encoded = err.data.slice(10);
+                const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
+                  ["string"],
+                  "0x" + encoded
+                );
+                if (decoded[0]) {
+                  throw new Error(`Transaction will fail: ${decoded[0]}`);
+                }
+              }
+            } catch (parseErr) {
+              
+            }
+          }
+
+          throw new Error(
+            `Transaction will fail. Possible reasons: 1) Contract paused, ` +
+              `2) Insufficient balance/allowance, 3) Amount < 30 USDT0, ` +
+              `4) YieldVault misconfigured. Error: ${
+                err.message || err.reason || "Unknown"
+              }`
+          );
+        }
+
+        // Submit transaction with better error handling
+        try {
+          const tx = await gameManager.stakeAsCreator(amountTokenUnits, {
+            gasLimit: gasEstimate + gasEstimate / BigInt(5), // Add 20% buffer
+          });
+          console.log("Stake transaction submitted:", tx.hash);
+
+          const receipt = await tx.wait();
+          if (!receipt) {
+            throw new Error("Transaction receipt not found");
+          }
+          console.log("Stake transaction confirmed:", receipt);
+
+          return true;
+        } catch (txError: unknown) {
+          console.error("Transaction submission failed:", txError);
+
+          // Handle RPC errors
+          const err = txError as {
+            code?: number | string;
+            message?: string;
+            data?: unknown;
+          };
+          if (err.code === -32603 || err.code === "UNKNOWN_ERROR") {
+            throw new Error(
+              `RPC Error: ${err.message || "Internal JSON-RPC error"}. ` +
+                `The transaction would fail on-chain. Please verify: ` +
+                `1) Contract is not paused, 2) Sufficient balance & allowance, ` +
+                `3) Minimum stake amount (30 USDT0), 4) YieldVault is configured correctly.`
+            );
+          }
+
+          throw txError;
+        }
       } catch (err) {
         console.error("Error staking as creator:", err);
-        const errorMessage =
-          (err instanceof Error && (err as { reason?: string }).reason) ||
-          (err instanceof Error ? err.message : null) ||
-          "Failed to stake";
+
+        // Handle specific error cases
+        let errorMessage: string;
+
+        if (err instanceof Error) {
+          // Check if it's an RPC error
+          if (
+            err.message.includes("Internal JSON-RPC error") ||
+            err.message.includes("could not coalesce error") ||
+            err.message.includes("UNKNOWN_ERROR")
+          ) {
+            errorMessage =
+              "Transaction would fail. Common causes:\n" +
+              "• Contract is paused (contact owner)\n" +
+              "• Insufficient token balance or allowance\n" +
+              "• Amount less than 30 USDT0 minimum\n" +
+              "• YieldVault protocol disabled\n\n" +
+              `Technical error: ${err.message}`;
+          } else {
+            const errWithReason = err as unknown as { reason?: string };
+            if (errWithReason.reason) {
+              errorMessage = errWithReason.reason;
+            } else {
+              errorMessage = err.message;
+            }
+          }
+        } else {
+          errorMessage =
+            "Failed to stake. Please try again or check the console for details.";
+        }
+
         setError(errorMessage);
         return false;
       } finally {
@@ -631,40 +869,47 @@ export function useGameManager(): UseGameManagerReturn {
   }, [getSigner]);
 
   // Get creator stake info
-  const getCreatorStake = useCallback(async (): Promise<CreatorStakeInfo | null> => {
-    try {
-      const signer = await getSigner();
-      const gameManagerConfig = getContractConfig("GameManager");
-      const gameManager = new ethers.Contract(
-        gameManagerConfig.address,
-        gameManagerConfig.abi,
-        signer
-      );
+  const getCreatorStake =
+    useCallback(async (): Promise<CreatorStakeInfo | null> => {
+      try {
+        const signer = await getSigner();
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          signer
+        );
 
-      const userAddress = await signer.getAddress();
-      const currencyInfo = CURRENCY_INFO[Currency.USDT0];
+        const userAddress = await signer.getAddress();
+        const currencyInfo = CURRENCY_INFO[Currency.USDT0];
 
-      // Call getCreatorStake function
-      const stakeInfo = await gameManager.getCreatorStake(userAddress);
-      
-      const stakedAmount = ethers.formatUnits(stakeInfo[0], currencyInfo.decimals);
-      const yieldAccumulated = ethers.formatUnits(stakeInfo[1], currencyInfo.decimals);
-      const timestamp = Number(stakeInfo[2]);
-      const activeGamesCount = Number(stakeInfo[3]);
-      const hasStaked = stakeInfo[4];
+        // Call getCreatorStake function
+        const stakeInfo = await gameManager.getCreatorStake(userAddress);
 
-      return {
-        stakedAmount,
-        yieldAccumulated,
-        timestamp,
-        activeGamesCount,
-        hasStaked,
-      };
-    } catch (err) {
-      console.error("Error getting creator stake:", err);
-      return null;
-    }
-  }, [getSigner]);
+        const stakedAmount = ethers.formatUnits(
+          stakeInfo[0],
+          currencyInfo.decimals
+        );
+        const yieldAccumulated = ethers.formatUnits(
+          stakeInfo[1],
+          currencyInfo.decimals
+        );
+        const timestamp = Number(stakeInfo[2]);
+        const activeGamesCount = Number(stakeInfo[3]);
+        const hasStaked = stakeInfo[4];
+
+        return {
+          stakedAmount,
+          yieldAccumulated,
+          timestamp,
+          activeGamesCount,
+          hasStaked,
+        };
+      } catch (err) {
+        console.error("Error getting creator stake:", err);
+        return null;
+      }
+    }, [getSigner]);
 
   return {
     createGame,
