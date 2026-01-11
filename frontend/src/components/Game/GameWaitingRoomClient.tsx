@@ -87,6 +87,7 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     getWinningsWithdrawn,
     getAllPlayersChoices,
     getRoundStatistics,
+    processRoundTimeout,
     isLoading: isGameManagerLoading,
   } = useGameManager();
 

@@ -1354,5 +1354,6 @@ export function useGameManager(): UseGameManagerReturn {
     getWinningsWithdrawn,
     getAllPlayersChoices,
     getRoundStatistics,
+    processRoundTimeout,
   };
 }
