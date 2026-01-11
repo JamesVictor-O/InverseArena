@@ -250,7 +250,18 @@ export function GameList() {
               Active Games
             </h1>
             <p className="text-gray-400 text-sm">
-              {games.length} total game{games.length !== 1 ? "s" : ""} found
+              {activeGames.length > 0 ? (
+                <>
+                  {activeGames.length} active game{activeGames.length !== 1 ? "s" : ""}
+                  {games.length > activeGames.length && (
+                    <> • {games.length} total</>
+                  )}
+                </>
+              ) : (
+                <>
+                  {games.length} total game{games.length !== 1 ? "s" : ""} found
+                </>
+              )}
             </p>
           </div>
           <button
