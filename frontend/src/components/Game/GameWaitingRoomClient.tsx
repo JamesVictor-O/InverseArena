@@ -27,6 +27,88 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
   );
 }
 
+function RoundTimeoutProcessor({
+  gameId,
+  roundNumber,
+  processRoundTimeout,
+  onProcessed,
+}: {
+  gameId: string;
+  roundNumber: number;
+  processRoundTimeout: (gameId: string) => Promise<boolean>;
+  onProcessed: () => Promise<void>;
+}) {
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [hasProcessed, setHasProcessed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (hasProcessed || isProcessing) return;
+
+    const processRound = async () => {
+      setIsProcessing(true);
+      try {
+        const success = await processRoundTimeout(gameId);
+        if (success) {
+          setHasProcessed(true);
+          // Wait a moment for blockchain to process, then refresh
+          setTimeout(async () => {
+            await onProcessed();
+            setIsProcessing(false);
+          }, 3000);
+        } else {
+          setIsProcessing(false);
+          // Still refresh to check if someone else processed it
+          setTimeout(async () => {
+            await onProcessed();
+          }, 2000);
+        }
+      } catch (err) {
+        console.error("Failed to process round timeout:", err);
+        setIsProcessing(false);
+        // Still refresh to check status
+        setTimeout(async () => {
+          await onProcessed();
+        }, 2000);
+      }
+    };
+
+    processRound();
+  }, [
+    gameId,
+    roundNumber,
+    processRoundTimeout,
+    onProcessed,
+    hasProcessed,
+    isProcessing,
+  ]);
+
+  return (
+    <div className="rounded-xl bg-orange-500/20 border-2 border-orange-500/50 p-4 text-center">
+      <div className="flex items-center justify-center gap-3">
+        {isProcessing ? (
+          <>
+            <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
+            <div className="text-orange-300 font-black text-lg">
+              Processing round...
+            </div>
+          </>
+        ) : hasProcessed ? (
+          <>
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+            <div className="text-green-300 font-black text-lg">
+              Round processed! Refreshing...
+            </div>
+          </>
+        ) : (
+          <div className="text-orange-300 font-black text-lg">
+            ⏱️ Round processing...
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function getStatusTag(game: GameData): { label: string; color: string } {
   switch (game.status) {
     case GameStatus.InProgress:
