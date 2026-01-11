@@ -176,7 +176,14 @@ export default function QuickPlayLobbyClient() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-white flex flex-col">
+    <>
+      <StakeModal
+        open={stakeModalOpen}
+        onClose={() => setStakeModalOpen(false)}
+        onStake={handleStake}
+        minStake={30} // MIN_CREATOR_STAKE = 30 USDT0
+      />
+      <div className="min-h-screen bg-background text-white flex flex-col">
       <div className="flex-1 mx-auto w-full max-w-7xl px-4 lg:px-8 py-6 lg:py-10">
         <div className="lg:grid lg:grid-cols-[1fr_400px] lg:gap-8">
           {/* Main Content */}
@@ -525,5 +532,6 @@ export default function QuickPlayLobbyClient() {
         </div>
       </div>
     </div>
+    </>
   );
 }
