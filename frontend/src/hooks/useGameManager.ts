@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { ethers } from "ethers";
 import { getContractConfig } from "@/lib/contracts-client";
-import { Currency, CURRENCY_INFO } from "@/lib/contract-types";
+import { Currency, CURRENCY_INFO, Choice } from "@/lib/contract-types";
 import { getContractAddresses } from "@/lib/contracts";
 import {
   requestMantleSepoliaNetwork,
@@ -34,6 +34,22 @@ interface CreatorStakeInfo {
   hasStaked: boolean;
 }
 
+interface PlayerInfo {
+  isPlaying: boolean;
+  hasMadeChoice: boolean;
+  choice?: Choice;
+  eliminated: boolean;
+  roundEliminated?: number;
+  entryAmount: string;
+}
+
+interface RoundInfo {
+  roundNumber: number;
+  deadline: number;
+  processed: boolean;
+  winningChoice?: Choice;
+}
+
 interface UseGameManagerReturn {
   createGame: (params: CreateGameParams) => Promise<string | null>;
   isLoading: boolean;
@@ -47,6 +63,20 @@ interface UseGameManagerReturn {
   unstakeCreator: () => Promise<boolean>;
   getCreatorStake: () => Promise<CreatorStakeInfo | null>;
   startGameAfterCountdown: (gameId: string) => Promise<boolean>;
+  makeChoice: (gameId: string, choice: Choice) => Promise<boolean>;
+  withdrawWinnings: (
+    gameId: string,
+    leaveInYield?: boolean
+  ) => Promise<boolean>;
+  getPlayerInfo: (
+    gameId: string,
+    playerAddress?: string
+  ) => Promise<PlayerInfo | null>;
+  getRoundInfo: (
+    gameId: string,
+    roundNumber: number
+  ) => Promise<RoundInfo | null>;
+  getWinningsWithdrawn: (gameId: string) => Promise<boolean>;
 }
 
 export function useGameManager(): UseGameManagerReturn {
@@ -725,13 +755,11 @@ export function useGameManager(): UseGameManagerReturn {
           };
           if (err.data && err.data !== "0x" && err.data.length > 10) {
             try {
-             
               const errorResult = gameManager.interface.parseError(err.data);
               if (errorResult) {
                 throw new Error(`Transaction will fail: ${errorResult.name}`);
               }
 
-           
               const errorSelector = "0x08c379a0";
               if (err.data.startsWith(errorSelector)) {
                 const encoded = err.data.slice(10);
@@ -743,9 +771,7 @@ export function useGameManager(): UseGameManagerReturn {
                   throw new Error(`Transaction will fail: ${decoded[0]}`);
                 }
               }
-            } catch (parseErr) {
-              
-            }
+            } catch (parseErr) {}
           }
 
           throw new Error(
@@ -974,6 +1000,204 @@ export function useGameManager(): UseGameManagerReturn {
     [getSigner]
   );
 
+  const makeChoice = useCallback(
+    async (gameId: string, choice: Choice): Promise<boolean> => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const signer = await getSigner();
+        const { gameManager } = getContractConfig(signer);
+
+        console.log(
+          `[useGameManager] Making choice for game ${gameId}: ${
+            choice === Choice.Head ? "Head" : "Tail"
+          }`
+        );
+
+        // Call makeChoice on the contract
+        const tx = await gameManager.makeChoice(gameId, choice, {
+          gasLimit: 500000,
+        });
+
+        console.log(
+          `[useGameManager] Make choice transaction submitted: ${tx.hash}`
+        );
+
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log(
+          `[useGameManager] Make choice confirmed in block: ${receipt?.blockNumber}`
+        );
+
+        return true;
+      } catch (err) {
+        console.error("Error making choice:", err);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const error = err as any;
+
+        let errorMessage = "Failed to make choice";
+        if (error.reason) {
+          errorMessage = error.reason;
+        } else if (error.data?.message) {
+          errorMessage = error.data.message;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        if (errorMessage.includes("Choice already made")) {
+          errorMessage = "You have already made your choice for this round";
+        } else if (errorMessage.includes("Round time expired")) {
+          errorMessage = "Round time has expired";
+        } else if (errorMessage.includes("Already eliminated")) {
+          errorMessage = "You have been eliminated from this game";
+        } else if (errorMessage.includes("Game not in progress")) {
+          errorMessage = "Game is not in progress";
+        }
+
+        setError(errorMessage);
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [getSigner]
+  );
+
+  const withdrawWinnings = useCallback(
+    async (gameId: string, leaveInYield = false): Promise<boolean> => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const signer = await getSigner();
+        const { gameManager } = getContractConfig(signer);
+
+        console.log(
+          `[useGameManager] Withdrawing winnings for game ${gameId}, leaveInYield: ${leaveInYield}`
+        );
+
+        // Call withdrawWinnings on the contract
+        const tx = await gameManager.withdrawWinnings(gameId, leaveInYield, {
+          gasLimit: 500000,
+        });
+
+        console.log(
+          `[useGameManager] Withdraw winnings transaction submitted: ${tx.hash}`
+        );
+
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log(
+          `[useGameManager] Withdraw winnings confirmed in block: ${receipt?.blockNumber}`
+        );
+
+        return true;
+      } catch (err) {
+        console.error("Error withdrawing winnings:", err);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const error = err as any;
+
+        let errorMessage = "Failed to withdraw winnings";
+        if (error.reason) {
+          errorMessage = error.reason;
+        } else if (error.data?.message) {
+          errorMessage = error.data.message;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        if (errorMessage.includes("Not the winner")) {
+          errorMessage = "You are not the winner of this game";
+        } else if (errorMessage.includes("Game not completed")) {
+          errorMessage = "Game is not completed yet";
+        } else if (errorMessage.includes("Already withdrawn")) {
+          errorMessage = "Winnings have already been withdrawn";
+        } else if (errorMessage.includes("Yield not yet distributed")) {
+          errorMessage = "Yield has not been distributed yet";
+        }
+
+        setError(errorMessage);
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [getSigner]
+  );
+
+  const getPlayerInfo = useCallback(
+    async (
+      gameId: string,
+      playerAddress?: string
+    ): Promise<PlayerInfo | null> => {
+      try {
+        const signer = await getSigner();
+        const { gameManager } = getContractConfig(signer);
+
+        const address = playerAddress || (await signer.getAddress());
+
+        const playerInfo = await gameManager.playerInfo(gameId, address);
+
+        return {
+          isPlaying: playerInfo[0],
+          hasMadeChoice: playerInfo[1],
+          choice:
+            playerInfo[2] !== undefined ? Number(playerInfo[2]) : undefined,
+          eliminated: playerInfo[3],
+          roundEliminated:
+            playerInfo[4] !== undefined ? Number(playerInfo[4]) : undefined,
+          entryAmount: ethers.formatUnits(playerInfo[5] || 0, 18),
+        };
+      } catch (err) {
+        console.error("Error getting player info:", err);
+        return null;
+      }
+    },
+    [getSigner]
+  );
+
+  const getRoundInfo = useCallback(
+    async (gameId: string, roundNumber: number): Promise<RoundInfo | null> => {
+      try {
+        const signer = await getSigner();
+        const { gameManager } = getContractConfig(signer);
+
+        const round = await gameManager.rounds(gameId, roundNumber);
+
+        return {
+          roundNumber,
+          deadline: Number(round.deadline || 0),
+          processed: round.processed || false,
+          winningChoice:
+            round.winningChoice !== undefined
+              ? Number(round.winningChoice)
+              : undefined,
+        };
+      } catch (err) {
+        console.error("Error getting round info:", err);
+        return null;
+      }
+    },
+    [getSigner]
+  );
+
+  const getWinningsWithdrawn = useCallback(
+    async (gameId: string): Promise<boolean> => {
+      try {
+        const signer = await getSigner();
+        const { gameManager } = getContractConfig(signer);
+
+        const withdrawn = await gameManager.winningsWithdrawn(gameId);
+        return withdrawn;
+      } catch (err) {
+        console.error("Error checking if winnings withdrawn:", err);
+        return false;
+      }
+    },
+    [getSigner]
+  );
+
   return {
     createGame,
     isLoading,
@@ -984,5 +1208,10 @@ export function useGameManager(): UseGameManagerReturn {
     unstakeCreator,
     getCreatorStake,
     startGameAfterCountdown,
+    makeChoice,
+    withdrawWinnings,
+    getPlayerInfo,
+    getRoundInfo,
+    getWinningsWithdrawn,
   };
 }

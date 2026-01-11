@@ -4,11 +4,11 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Dashboard/Icon";
 import { useGames, GameData } from "@/hooks/useGames";
-import { GameStatus, Currency, CURRENCY_INFO } from "@/lib/contract-types";
+import { GameStatus, Currency, CURRENCY_INFO, Choice } from "@/lib/contract-types";
 import { useConnectActions } from "@/components/Connect/ConnectActions";
 import { useGameManager } from "@/hooks/useGameManager";
 import { Avatar } from "./Avatar";
-import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Coins } from "lucide-react";
 
 function ProgressBar({ value, max }: { value: number; max: number }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
@@ -72,13 +72,35 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
   const { walletAddress } = useConnectActions();
   const { games, isLoading, error, refreshGames, fetchGameById, joinGame } =
     useGames(walletAddress || undefined);
-  const { startGameAfterCountdown, isLoading: isStartingGame } =
-    useGameManager();
+  const {
+    startGameAfterCountdown,
+    isLoading: isStartingGame,
+    makeChoice,
+    withdrawWinnings,
+    getPlayerInfo,
+    getRoundInfo,
+    getWinningsWithdrawn,
+    isLoading: isGameManagerLoading,
+  } = useGameManager();
 
   const [isJoining, setIsJoining] = React.useState(false);
   const [timeRemaining, setTimeRemaining] = React.useState<number | null>(null);
   const [gameStarting, setGameStarting] = React.useState(false);
   const [gameStarted, setGameStarted] = React.useState(false);
+  const [playerInfo, setPlayerInfo] = React.useState<{
+    hasMadeChoice: boolean;
+    choice?: Choice;
+    eliminated: boolean;
+  } | null>(null);
+  const [roundInfo, setRoundInfo] = React.useState<{
+    deadline: number;
+    processed: boolean;
+    winningChoice?: Choice;
+  } | null>(null);
+  const [roundTimeRemaining, setRoundTimeRemaining] = React.useState<number | null>(null);
+  const [isMakingChoice, setIsMakingChoice] = React.useState(false);
+  const [isWithdrawing, setIsWithdrawing] = React.useState(false);
+  const [winningsWithdrawn, setWinningsWithdrawn] = React.useState(false);
 
   const normalizedGameId = React.useMemo(() => {
     if (!gameId || gameId === "undefined" || gameId === "null") {
@@ -230,6 +252,79 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     startGameAfterCountdown,
   ]);
 
+  // Fetch player info and round info when game is in progress
+  React.useEffect(() => {
+    if (!currentGame || !walletAddress || currentGame.status !== GameStatus.InProgress) {
+      setPlayerInfo(null);
+      setRoundInfo(null);
+      setRoundTimeRemaining(null);
+      return;
+    }
+
+    const fetchGameState = async () => {
+      try {
+        const [player, round] = await Promise.all([
+          getPlayerInfo(currentGame.gameId, walletAddress),
+          getRoundInfo(currentGame.gameId, currentGame.currentRound),
+        ]);
+
+        if (player) {
+          setPlayerInfo({
+            hasMadeChoice: player.hasMadeChoice,
+            choice: player.choice,
+            eliminated: player.eliminated,
+          });
+        }
+
+        if (round) {
+          setRoundInfo(round);
+          // Calculate round time remaining
+          const now = Math.floor(Date.now() / 1000);
+          const remaining = Math.max(0, round.deadline - now);
+          setRoundTimeRemaining(remaining);
+        }
+      } catch (err) {
+        console.error("Error fetching game state:", err);
+      }
+    };
+
+    fetchGameState();
+    const interval = setInterval(fetchGameState, 1000); // Update every second
+    return () => clearInterval(interval);
+  }, [
+    currentGame?.status,
+    currentGame?.gameId,
+    currentGame?.currentRound,
+    walletAddress,
+    getPlayerInfo,
+    getRoundInfo,
+  ]);
+
+  // Check if winnings are withdrawn for completed games
+  React.useEffect(() => {
+    if (
+      !currentGame ||
+      !walletAddress ||
+      currentGame.status !== GameStatus.Completed ||
+      currentGame.winner?.toLowerCase() !== walletAddress.toLowerCase()
+    ) {
+      return;
+    }
+
+    const checkWithdrawal = async () => {
+      const withdrawn = await getWinningsWithdrawn(currentGame.gameId);
+      setWinningsWithdrawn(withdrawn);
+    };
+
+    checkWithdrawal();
+  }, [
+    currentGame?.status,
+    currentGame?.gameId,
+    currentGame?.winner,
+    walletAddress,
+    getWinningsWithdrawn,
+  ]);
+
   // Auto-refresh game data
   React.useEffect(() => {
     if (!currentGame) return;
@@ -260,6 +355,54 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
       setIsJoining(false);
     }
   }, [currentGame, joinGame, refreshGames]);
+
+  const handleMakeChoice = React.useCallback(
+    async (choice: Choice) => {
+      if (!currentGame || !walletAddress) return;
+
+      setIsMakingChoice(true);
+      try {
+        const success = await makeChoice(currentGame.gameId, choice);
+        if (success) {
+          // Refresh player info after making choice
+          const player = await getPlayerInfo(currentGame.gameId, walletAddress);
+          if (player) {
+            setPlayerInfo({
+              hasMadeChoice: player.hasMadeChoice,
+              choice: player.choice,
+              eliminated: player.eliminated,
+            });
+          }
+          await refreshGames();
+        }
+      } catch (err) {
+        console.error("Failed to make choice:", err);
+      } finally {
+        setIsMakingChoice(false);
+      }
+    },
+    [currentGame, walletAddress, makeChoice, getPlayerInfo, refreshGames]
+  );
+
+  const handleWithdraw = React.useCallback(
+    async (leaveInYield = false) => {
+      if (!currentGame || !walletAddress) return;
+
+      setIsWithdrawing(true);
+      try {
+        const success = await withdrawWinnings(currentGame.gameId, leaveInYield);
+        if (success) {
+          setWinningsWithdrawn(true);
+          await refreshGames();
+        }
+      } catch (err) {
+        console.error("Failed to withdraw winnings:", err);
+      } finally {
+        setIsWithdrawing(false);
+      }
+    },
+    [currentGame, walletAddress, withdrawWinnings, refreshGames]
+  );
 
   // Handle invalid gameId
   if (!normalizedGameId) {
@@ -520,10 +663,14 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                     <div className="rounded-2xl border-2 border-primary/50 bg-primary/10 backdrop-blur-xl p-8 text-center">
                       <div className="mb-4">
                         <div className="text-6xl lg:text-7xl font-black text-primary mb-2 font-mono tracking-wider drop-shadow-[0_0_20px_rgba(0,238,255,0.5)]">
-                          {timeRemaining > 0 ? formatTime(timeRemaining) : "00:00"}
+                          {timeRemaining > 0
+                            ? formatTime(timeRemaining)
+                            : "00:00"}
                         </div>
                         <p className="text-gray-300 font-bold text-sm uppercase tracking-widest">
-                          {timeRemaining > 0 ? "Game starts in" : "Starting game..."}
+                          {timeRemaining > 0
+                            ? "Game starts in"
+                            : "Starting game..."}
                         </p>
                       </div>
                       <div className="flex items-center justify-center gap-6 text-sm text-gray-400">
@@ -607,12 +754,207 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                 </button>
               )}
 
-              {currentGame.isPlayer && (
+              {currentGame.isPlayer && currentGame.status !== GameStatus.InProgress && (
                 <div className="w-full h-12 lg:h-14 rounded-xl bg-white/10 border border-white/20 text-white/70 font-black text-sm tracking-wide flex items-center justify-center gap-2">
                   <Icon name="check_circle" />
                   You&apos;re in this game
                 </div>
               )}
+
+              {/* Round Interface - Make Choice */}
+              {currentGame.status === GameStatus.InProgress &&
+                currentGame.isPlayer &&
+                playerInfo &&
+                !playerInfo.eliminated && (
+                  <div className="mb-6 space-y-4">
+                    {/* Round Timer */}
+                    <div className="rounded-2xl border-2 border-red-500/50 bg-red-500/10 backdrop-blur-xl p-6 text-center">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-black text-red-300 mb-2">
+                          Round {currentGame.currentRound}
+                        </h3>
+                        <div className="text-5xl lg:text-6xl font-black text-red-400 mb-2 font-mono tracking-wider drop-shadow-[0_0_20px_rgba(239,68,68,0.5)]">
+                          {roundTimeRemaining !== null
+                            ? roundTimeRemaining > 0
+                              ? `${roundTimeRemaining}s`
+                              : "00"
+                            : "..."}
+                        </div>
+                        <p className="text-gray-300 font-bold text-sm uppercase tracking-widest">
+                          Time to choose!
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Choice Buttons */}
+                    {!playerInfo.hasMadeChoice && roundTimeRemaining !== null && roundTimeRemaining > 0 && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          onClick={() => handleMakeChoice(Choice.Head)}
+                          disabled={isMakingChoice || isGameManagerLoading}
+                          className={`h-20 lg:h-24 rounded-2xl font-black text-lg tracking-wide transition-all border-2 ${
+                            isMakingChoice || isGameManagerLoading
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:scale-105 hover:shadow-[0_0_30px_rgba(0,238,255,0.4)]"
+                          } ${
+                            playerInfo.choice === Choice.Head
+                              ? "bg-primary border-primary text-background shadow-[0_0_25px_rgba(0,238,255,0.5)]"
+                              : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                          }`}
+                        >
+                          {isMakingChoice && playerInfo.choice === Choice.Head ? (
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                          ) : (
+                            <>
+                              <div className="text-3xl mb-1">👤</div>
+                              <div>HEADS</div>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleMakeChoice(Choice.Tail)}
+                          disabled={isMakingChoice || isGameManagerLoading}
+                          className={`h-20 lg:h-24 rounded-2xl font-black text-lg tracking-wide transition-all border-2 ${
+                            isMakingChoice || isGameManagerLoading
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:scale-105 hover:shadow-[0_0_30px_rgba(0,238,255,0.4)]"
+                          } ${
+                            playerInfo.choice === Choice.Tail
+                              ? "bg-primary border-primary text-background shadow-[0_0_25px_rgba(0,238,255,0.5)]"
+                              : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                          }`}
+                        >
+                          {isMakingChoice && playerInfo.choice === Choice.Tail ? (
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                          ) : (
+                            <>
+                              <div className="text-3xl mb-1">🎯</div>
+                              <div>TAILS</div>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Choice Made Message */}
+                    {playerInfo.hasMadeChoice && (
+                      <div className="rounded-xl bg-green-500/20 border-2 border-green-500/50 p-4 text-center">
+                        <div className="text-green-300 font-black text-lg mb-1">
+                          ✅ Choice Made!
+                        </div>
+                        <div className="text-green-400 text-sm">
+                          You chose{" "}
+                          <span className="font-bold">
+                            {playerInfo.choice === Choice.Head ? "HEADS" : "TAILS"}
+                          </span>
+                          . Waiting for others...
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Round Time Expired */}
+                    {roundTimeRemaining !== null && roundTimeRemaining === 0 && !roundInfo?.processed && (
+                      <div className="rounded-xl bg-orange-500/20 border-2 border-orange-500/50 p-4 text-center">
+                        <div className="text-orange-300 font-black text-lg">
+                          ⏱️ Round processing...
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Eliminated */}
+                    {playerInfo.eliminated && (
+                      <div className="rounded-xl bg-red-500/20 border-2 border-red-500/50 p-6 text-center">
+                        <div className="text-red-300 font-black text-xl mb-2">
+                          ❌ Eliminated
+                        </div>
+                        <div className="text-red-400 text-sm">
+                          You have been eliminated from this game.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {/* Withdraw Winnings - Game Completed */}
+              {currentGame.status === GameStatus.Completed &&
+                currentGame.winner &&
+                walletAddress &&
+                currentGame.winner.toLowerCase() === walletAddress.toLowerCase() &&
+                !winningsWithdrawn && (
+                  <div className="mb-6 rounded-2xl border-2 border-green-500/50 bg-green-500/10 backdrop-blur-xl p-6">
+                    <div className="text-center mb-4">
+                      <div className="text-4xl mb-2">🏆</div>
+                      <div className="text-green-300 font-black text-2xl mb-1">
+                        You Won!
+                      </div>
+                      <div className="text-green-400 text-sm mb-4">
+                        Total Prize Pool: {parseFloat(currentGame.totalPrizePool).toFixed(4)}{" "}
+                        {currencyInfo.symbol}
+                        {parseFloat(currentGame.yieldAccumulated) > 0 && (
+                          <span className="block mt-1">
+                            + Yield: {parseFloat(currentGame.yieldAccumulated).toFixed(4)}{" "}
+                            {currencyInfo.symbol}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <button
+                        onClick={() => handleWithdraw(false)}
+                        disabled={isWithdrawing || isGameManagerLoading}
+                        className="w-full h-14 rounded-xl bg-green-500 text-white font-black text-base tracking-wide hover:bg-green-600 transition-colors shadow-[0_0_25px_rgba(34,197,94,0.4)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isWithdrawing || isGameManagerLoading ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Withdrawing...
+                          </>
+                        ) : (
+                          <>
+                            <Coins className="w-5 h-5" />
+                            Withdraw to Wallet
+                          </>
+                        )}
+                      </button>
+                      {currentGame.currency !== Currency.MNT && (
+                        <button
+                          onClick={() => handleWithdraw(true)}
+                          disabled={isWithdrawing || isGameManagerLoading}
+                          className="w-full h-12 rounded-xl bg-white/10 border border-white/20 text-white font-black text-sm tracking-wide hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isWithdrawing || isGameManagerLoading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Withdrawing...
+                            </>
+                          ) : (
+                            <>
+                              <Icon name="trending_up" className="text-sm" />
+                              Withdraw & Keep in Yield
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              {/* Winnings Already Withdrawn */}
+              {currentGame.status === GameStatus.Completed &&
+                currentGame.winner &&
+                walletAddress &&
+                currentGame.winner.toLowerCase() === walletAddress.toLowerCase() &&
+                winningsWithdrawn && (
+                  <div className="mb-6 rounded-xl bg-green-500/20 border-2 border-green-500/50 p-4 text-center">
+                    <div className="text-green-300 font-black text-lg mb-1">
+                      ✅ Winnings Withdrawn
+                    </div>
+                    <div className="text-green-400 text-sm">
+                      Your winnings have been successfully withdrawn!
+                    </div>
+                  </div>
+                )}
             </div>
 
             {/* Players List - With Pulse Animation During Countdown */}
