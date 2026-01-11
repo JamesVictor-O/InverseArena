@@ -48,6 +48,17 @@ interface RoundInfo {
   deadline: number;
   processed: boolean;
   winningChoice?: Choice;
+  headCount?: number;
+  tailCount?: number;
+  survivors?: string[];
+}
+
+interface PlayerChoiceInfo {
+  address: string;
+  choice?: Choice;
+  hasMadeChoice: boolean;
+  eliminated: boolean;
+  roundEliminated?: number;
 }
 
 interface UseGameManagerReturn {
@@ -77,6 +88,16 @@ interface UseGameManagerReturn {
     roundNumber: number
   ) => Promise<RoundInfo | null>;
   getWinningsWithdrawn: (gameId: string) => Promise<boolean>;
+  getAllPlayersChoices: (
+    gameId: string,
+    roundNumber: number,
+    playerList: string[]
+  ) => Promise<PlayerChoiceInfo[]>;
+  getRoundStatistics: (
+    gameId: string,
+    roundNumber: number,
+    playerList: string[]
+  ) => Promise<{ headCount: number; tailCount: number } | null>;
 }
 
 export function useGameManager(): UseGameManagerReturn {
@@ -1207,6 +1228,94 @@ export function useGameManager(): UseGameManagerReturn {
     [getSigner]
   );
 
+  const getAllPlayersChoices = useCallback(
+    async (
+      gameId: string,
+      roundNumber: number,
+      playerList: string[]
+    ): Promise<PlayerChoiceInfo[]> => {
+      try {
+        const signer = await getSigner();
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          signer
+        );
+
+        const choices: PlayerChoiceInfo[] = [];
+
+        // Fetch player info for each player (includes their choice)
+        for (const playerAddress of playerList) {
+          try {
+            const playerInfoData = await gameManager.getPlayerInfo(
+              gameId,
+              playerAddress
+            );
+            choices.push({
+              address: playerAddress,
+              choice:
+                playerInfoData.choice !== undefined
+                  ? Number(playerInfoData.choice)
+                  : undefined,
+              hasMadeChoice: playerInfoData.hasMadeChoice || false,
+              eliminated: playerInfoData.eliminated || false,
+              roundEliminated:
+                playerInfoData.roundEliminated !== undefined
+                  ? Number(playerInfoData.roundEliminated)
+                  : undefined,
+            });
+          } catch (err) {
+            console.warn(
+              `Failed to get player info for ${playerAddress}:`,
+              err
+            );
+          }
+        }
+
+        return choices;
+      } catch (err) {
+        console.error("Error getting all players choices:", err);
+        return [];
+      }
+    },
+    [getSigner]
+  );
+
+  const getRoundStatistics = useCallback(
+    async (
+      gameId: string,
+      roundNumber: number,
+      playerList: string[]
+    ): Promise<{ headCount: number; tailCount: number } | null> => {
+      try {
+        // Calculate statistics by fetching all players' choices
+        const playerChoices = await getAllPlayersChoices(
+          gameId,
+          roundNumber,
+          playerList
+        );
+
+        let headCount = 0;
+        let tailCount = 0;
+
+        for (const player of playerChoices) {
+          if (player.choice === Choice.Head) {
+            headCount++;
+          } else if (player.choice === Choice.Tail) {
+            tailCount++;
+          }
+        }
+
+        return { headCount, tailCount };
+      } catch (err) {
+        console.error("Error getting round statistics:", err);
+        return null;
+      }
+    },
+    [getAllPlayersChoices]
+  );
+
   const getWinningsWithdrawn = useCallback(
     async (gameId: string): Promise<boolean> => {
       try {
@@ -1243,5 +1352,7 @@ export function useGameManager(): UseGameManagerReturn {
     getPlayerInfo,
     getRoundInfo,
     getWinningsWithdrawn,
+    getAllPlayersChoices,
+    getRoundStatistics,
   };
 }

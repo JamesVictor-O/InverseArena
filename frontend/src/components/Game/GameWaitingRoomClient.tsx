@@ -4,7 +4,12 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Dashboard/Icon";
 import { useGames, GameData } from "@/hooks/useGames";
-import { GameStatus, Currency, CURRENCY_INFO, Choice } from "@/lib/contract-types";
+import {
+  GameStatus,
+  Currency,
+  CURRENCY_INFO,
+  Choice,
+} from "@/lib/contract-types";
 import { useConnectActions } from "@/components/Connect/ConnectActions";
 import { useGameManager } from "@/hooks/useGameManager";
 import { Avatar } from "./Avatar";
@@ -80,6 +85,8 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     getPlayerInfo,
     getRoundInfo,
     getWinningsWithdrawn,
+    getAllPlayersChoices,
+    getRoundStatistics,
     isLoading: isGameManagerLoading,
   } = useGameManager();
 
@@ -97,10 +104,26 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     processed: boolean;
     winningChoice?: Choice;
   } | null>(null);
-  const [roundTimeRemaining, setRoundTimeRemaining] = React.useState<number | null>(null);
+  const [roundTimeRemaining, setRoundTimeRemaining] = React.useState<
+    number | null
+  >(null);
   const [isMakingChoice, setIsMakingChoice] = React.useState(false);
   const [isWithdrawing, setIsWithdrawing] = React.useState(false);
   const [winningsWithdrawn, setWinningsWithdrawn] = React.useState(false);
+  const [allPlayersChoices, setAllPlayersChoices] = React.useState<
+    Array<{
+      address: string;
+      choice?: Choice;
+      hasMadeChoice: boolean;
+      eliminated: boolean;
+      roundEliminated?: number;
+    }>
+  >([]);
+  const [roundStats, setRoundStats] = React.useState<{
+    headCount: number;
+    tailCount: number;
+  } | null>(null);
+  const [previousRound, setPreviousRound] = React.useState<number>(0);
 
   const normalizedGameId = React.useMemo(() => {
     if (!gameId || gameId === "undefined" || gameId === "null") {
@@ -254,18 +277,34 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
 
   // Fetch player info and round info when game is in progress
   React.useEffect(() => {
-    if (!currentGame || !walletAddress || currentGame.status !== GameStatus.InProgress) {
+    if (
+      !currentGame ||
+      !walletAddress ||
+      currentGame.status !== GameStatus.InProgress
+    ) {
       setPlayerInfo(null);
       setRoundInfo(null);
       setRoundTimeRemaining(null);
+      setAllPlayersChoices([]);
+      setRoundStats(null);
       return;
     }
 
     const fetchGameState = async () => {
       try {
-        const [player, round] = await Promise.all([
+        const [player, round, choices, stats] = await Promise.all([
           getPlayerInfo(currentGame.gameId, walletAddress),
           getRoundInfo(currentGame.gameId, currentGame.currentRound),
+          getAllPlayersChoices(
+            currentGame.gameId,
+            currentGame.currentRound,
+            currentGame.playerList || []
+          ),
+          getRoundStatistics(
+            currentGame.gameId,
+            currentGame.currentRound,
+            currentGame.playerList || []
+          ),
         ]);
 
         if (player) {
@@ -282,6 +321,21 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
           const now = Math.floor(Date.now() / 1000);
           const remaining = Math.max(0, round.deadline - now);
           setRoundTimeRemaining(remaining);
+
+          // Detect round change
+          if (round.roundNumber && round.roundNumber !== previousRound) {
+            setPreviousRound(round.roundNumber);
+            // Round changed - refresh everything
+            await refreshGames();
+          }
+        }
+
+        if (choices) {
+          setAllPlayersChoices(choices);
+        }
+
+        if (stats) {
+          setRoundStats(stats);
         }
       } catch (err) {
         console.error("Error fetching game state:", err);
@@ -289,15 +343,20 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     };
 
     fetchGameState();
-    const interval = setInterval(fetchGameState, 1000); // Update every second
+    const interval = setInterval(fetchGameState, 2000); // Update every 2 seconds
     return () => clearInterval(interval);
   }, [
     currentGame?.status,
     currentGame?.gameId,
     currentGame?.currentRound,
+    currentGame?.playerList,
     walletAddress,
+    previousRound,
     getPlayerInfo,
     getRoundInfo,
+    getAllPlayersChoices,
+    getRoundStatistics,
+    refreshGames,
   ]);
 
   // Check if winnings are withdrawn for completed games
@@ -390,7 +449,10 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
 
       setIsWithdrawing(true);
       try {
-        const success = await withdrawWinnings(currentGame.gameId, leaveInYield);
+        const success = await withdrawWinnings(
+          currentGame.gameId,
+          leaveInYield
+        );
         if (success) {
           setWinningsWithdrawn(true);
           await refreshGames();
@@ -754,12 +816,13 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                 </button>
               )}
 
-              {currentGame.isPlayer && currentGame.status !== GameStatus.InProgress && (
-                <div className="w-full h-12 lg:h-14 rounded-xl bg-white/10 border border-white/20 text-white/70 font-black text-sm tracking-wide flex items-center justify-center gap-2">
-                  <Icon name="check_circle" />
-                  You&apos;re in this game
-                </div>
-              )}
+              {currentGame.isPlayer &&
+                currentGame.status !== GameStatus.InProgress && (
+                  <div className="w-full h-12 lg:h-14 rounded-xl bg-white/10 border border-white/20 text-white/70 font-black text-sm tracking-wide flex items-center justify-center gap-2">
+                    <Icon name="check_circle" />
+                    You&apos;re in this game
+                  </div>
+                )}
 
               {/* Round Interface - Make Choice */}
               {currentGame.status === GameStatus.InProgress &&
@@ -787,54 +850,58 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                     </div>
 
                     {/* Choice Buttons */}
-                    {!playerInfo.hasMadeChoice && roundTimeRemaining !== null && roundTimeRemaining > 0 && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <button
-                          onClick={() => handleMakeChoice(Choice.Head)}
-                          disabled={isMakingChoice || isGameManagerLoading}
-                          className={`h-20 lg:h-24 rounded-2xl font-black text-lg tracking-wide transition-all border-2 ${
-                            isMakingChoice || isGameManagerLoading
-                              ? "opacity-50 cursor-not-allowed"
-                              : "hover:scale-105 hover:shadow-[0_0_30px_rgba(0,238,255,0.4)]"
-                          } ${
-                            playerInfo.choice === Choice.Head
-                              ? "bg-primary border-primary text-background shadow-[0_0_25px_rgba(0,238,255,0.5)]"
-                              : "bg-white/10 border-white/20 text-white hover:bg-white/20"
-                          }`}
-                        >
-                          {isMakingChoice && playerInfo.choice === Choice.Head ? (
-                            <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                          ) : (
-                            <>
-                              <div className="text-3xl mb-1">👤</div>
-                              <div>HEADS</div>
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleMakeChoice(Choice.Tail)}
-                          disabled={isMakingChoice || isGameManagerLoading}
-                          className={`h-20 lg:h-24 rounded-2xl font-black text-lg tracking-wide transition-all border-2 ${
-                            isMakingChoice || isGameManagerLoading
-                              ? "opacity-50 cursor-not-allowed"
-                              : "hover:scale-105 hover:shadow-[0_0_30px_rgba(0,238,255,0.4)]"
-                          } ${
-                            playerInfo.choice === Choice.Tail
-                              ? "bg-primary border-primary text-background shadow-[0_0_25px_rgba(0,238,255,0.5)]"
-                              : "bg-white/10 border-white/20 text-white hover:bg-white/20"
-                          }`}
-                        >
-                          {isMakingChoice && playerInfo.choice === Choice.Tail ? (
-                            <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                          ) : (
-                            <>
-                              <div className="text-3xl mb-1">🎯</div>
-                              <div>TAILS</div>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
+                    {!playerInfo.hasMadeChoice &&
+                      roundTimeRemaining !== null &&
+                      roundTimeRemaining > 0 && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <button
+                            onClick={() => handleMakeChoice(Choice.Head)}
+                            disabled={isMakingChoice || isGameManagerLoading}
+                            className={`h-20 lg:h-24 rounded-2xl font-black text-lg tracking-wide transition-all border-2 ${
+                              isMakingChoice || isGameManagerLoading
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:scale-105 hover:shadow-[0_0_30px_rgba(0,238,255,0.4)]"
+                            } ${
+                              playerInfo.choice === Choice.Head
+                                ? "bg-primary border-primary text-background shadow-[0_0_25px_rgba(0,238,255,0.5)]"
+                                : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                            }`}
+                          >
+                            {isMakingChoice &&
+                            playerInfo.choice === Choice.Head ? (
+                              <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                            ) : (
+                              <>
+                                <div className="text-3xl mb-1">👤</div>
+                                <div>HEADS</div>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleMakeChoice(Choice.Tail)}
+                            disabled={isMakingChoice || isGameManagerLoading}
+                            className={`h-20 lg:h-24 rounded-2xl font-black text-lg tracking-wide transition-all border-2 ${
+                              isMakingChoice || isGameManagerLoading
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:scale-105 hover:shadow-[0_0_30px_rgba(0,238,255,0.4)]"
+                            } ${
+                              playerInfo.choice === Choice.Tail
+                                ? "bg-primary border-primary text-background shadow-[0_0_25px_rgba(0,238,255,0.5)]"
+                                : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                            }`}
+                          >
+                            {isMakingChoice &&
+                            playerInfo.choice === Choice.Tail ? (
+                              <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                            ) : (
+                              <>
+                                <div className="text-3xl mb-1">🎯</div>
+                                <div>TAILS</div>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
 
                     {/* Choice Made Message */}
                     {playerInfo.hasMadeChoice && (
@@ -845,7 +912,9 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                         <div className="text-green-400 text-sm">
                           You chose{" "}
                           <span className="font-bold">
-                            {playerInfo.choice === Choice.Head ? "HEADS" : "TAILS"}
+                            {playerInfo.choice === Choice.Head
+                              ? "HEADS"
+                              : "TAILS"}
                           </span>
                           . Waiting for others...
                         </div>
@@ -853,13 +922,15 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                     )}
 
                     {/* Round Time Expired */}
-                    {roundTimeRemaining !== null && roundTimeRemaining === 0 && !roundInfo?.processed && (
-                      <div className="rounded-xl bg-orange-500/20 border-2 border-orange-500/50 p-4 text-center">
-                        <div className="text-orange-300 font-black text-lg">
-                          ⏱️ Round processing...
+                    {roundTimeRemaining !== null &&
+                      roundTimeRemaining === 0 &&
+                      !roundInfo?.processed && (
+                        <div className="rounded-xl bg-orange-500/20 border-2 border-orange-500/50 p-4 text-center">
+                          <div className="text-orange-300 font-black text-lg">
+                            ⏱️ Round processing...
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Eliminated */}
                     {playerInfo.eliminated && (
@@ -872,6 +943,87 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                         </div>
                       </div>
                     )}
+
+                    {/* Round Statistics */}
+                    {roundStats &&
+                      roundTimeRemaining !== null &&
+                      roundTimeRemaining > 0 && (
+                        <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+                          <div className="text-center mb-3">
+                            <div className="text-xs text-gray-400 font-bold mb-2 uppercase tracking-widest">
+                              Current Round Statistics
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                                <div className="text-2xl font-black text-blue-400 mb-1">
+                                  {roundStats.headCount}
+                                </div>
+                                <div className="text-xs text-blue-300 font-bold">
+                                  HEADS
+                                </div>
+                              </div>
+                              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                                <div className="text-2xl font-black text-purple-400 mb-1">
+                                  {roundStats.tailCount}
+                                </div>
+                                <div className="text-xs text-purple-300 font-bold">
+                                  TAILS
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Round Results - When Processed */}
+                    {roundInfo?.processed &&
+                      roundInfo.winningChoice !== undefined && (
+                        <div className="rounded-2xl border-2 border-green-500/50 bg-green-500/10 backdrop-blur-xl p-6">
+                          <div className="text-center mb-4">
+                            <div className="text-green-300 font-black text-xl mb-2">
+                              🎯 Round {currentGame.currentRound} Results
+                            </div>
+                            <div className="text-green-400 text-lg font-bold mb-3">
+                              Winning Choice:{" "}
+                              {roundInfo.winningChoice === Choice.Head
+                                ? "HEADS 👤"
+                                : "TAILS 🎯"}
+                            </div>
+                            {roundStats && (
+                              <div className="text-sm text-gray-300 mb-4">
+                                Heads: {roundStats.headCount} | Tails:{" "}
+                                {roundStats.tailCount}
+                              </div>
+                            )}
+                            <div className="text-green-300 text-sm">
+                              {roundInfo.winningChoice === Choice.Head
+                                ? roundStats?.headCount || 0
+                                : roundStats?.tailCount || 0}{" "}
+                              players survived,{" "}
+                              {roundInfo.winningChoice === Choice.Head
+                                ? roundStats?.tailCount || 0
+                                : roundStats?.headCount || 0}{" "}
+                              eliminated
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Round Transition - New Round Starting */}
+                    {previousRound > 0 &&
+                      currentGame.currentRound > previousRound &&
+                      !roundInfo?.processed && (
+                        <div className="rounded-xl bg-primary/20 border-2 border-primary/50 p-4 animate-pulse">
+                          <div className="text-center">
+                            <div className="text-primary font-black text-lg mb-1">
+                              🎮 Round {currentGame.currentRound} Starting!
+                            </div>
+                            <div className="text-primary/80 text-sm">
+                              Survivors advance to the next round
+                            </div>
+                          </div>
+                        </div>
+                      )}
                   </div>
                 )}
 
@@ -879,7 +1031,8 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
               {currentGame.status === GameStatus.Completed &&
                 currentGame.winner &&
                 walletAddress &&
-                currentGame.winner.toLowerCase() === walletAddress.toLowerCase() &&
+                currentGame.winner.toLowerCase() ===
+                  walletAddress.toLowerCase() &&
                 !winningsWithdrawn && (
                   <div className="mb-6 rounded-2xl border-2 border-green-500/50 bg-green-500/10 backdrop-blur-xl p-6">
                     <div className="text-center mb-4">
@@ -888,11 +1041,15 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                         You Won!
                       </div>
                       <div className="text-green-400 text-sm mb-4">
-                        Total Prize Pool: {parseFloat(currentGame.totalPrizePool).toFixed(4)}{" "}
+                        Total Prize Pool:{" "}
+                        {parseFloat(currentGame.totalPrizePool).toFixed(4)}{" "}
                         {currencyInfo.symbol}
                         {parseFloat(currentGame.yieldAccumulated) > 0 && (
                           <span className="block mt-1">
-                            + Yield: {parseFloat(currentGame.yieldAccumulated).toFixed(4)}{" "}
+                            + Yield:{" "}
+                            {parseFloat(currentGame.yieldAccumulated).toFixed(
+                              4
+                            )}{" "}
                             {currencyInfo.symbol}
                           </span>
                         )}
@@ -944,7 +1101,8 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
               {currentGame.status === GameStatus.Completed &&
                 currentGame.winner &&
                 walletAddress &&
-                currentGame.winner.toLowerCase() === walletAddress.toLowerCase() &&
+                currentGame.winner.toLowerCase() ===
+                  walletAddress.toLowerCase() &&
                 winningsWithdrawn && (
                   <div className="mb-6 rounded-xl bg-green-500/20 border-2 border-green-500/50 p-4 text-center">
                     <div className="text-green-300 font-black text-lg mb-1">
@@ -981,11 +1139,31 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                         currentGame.creator &&
                         address.toLowerCase() ===
                           currentGame.creator.toLowerCase();
+
+                      // Find player's choice info
+                      const playerChoiceInfo = allPlayersChoices.find(
+                        (p) => p.address.toLowerCase() === address.toLowerCase()
+                      );
+
+                      const isEliminated =
+                        playerChoiceInfo?.eliminated || false;
+                      const hasMadeChoice =
+                        playerChoiceInfo?.hasMadeChoice || false;
+                      const playerChoice = playerChoiceInfo?.choice;
+                      const isWinner =
+                        currentGame.status === GameStatus.Completed &&
+                        currentGame.winner?.toLowerCase() ===
+                          address.toLowerCase();
+
                       return (
                         <div
                           key={`${address}-${index}`}
                           className={`flex flex-col items-center p-4 rounded-xl border transition-all ${
-                            isYou
+                            isWinner
+                              ? "bg-yellow-500/20 border-yellow-500/50"
+                              : isEliminated
+                              ? "bg-red-500/10 border-red-500/30 opacity-60"
+                              : isYou
                               ? "bg-primary/10 border-primary/30"
                               : currentGame.status === GameStatus.Countdown
                               ? "bg-orange-500/10 border-orange-500/30"
@@ -994,11 +1172,11 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                         >
                           <Avatar
                             name={isYou ? "You" : formatAddress(address)}
-                            status="ready"
+                            status={hasMadeChoice ? "ready" : "waiting"}
                             size={48}
-                            highlight={isYou}
+                            highlight={isYou || isWinner}
                           />
-                          <div className="mt-2 text-xs font-bold text-center">
+                          <div className="mt-2 text-xs font-bold text-center w-full">
                             <div className="text-white truncate w-full">
                               {isYou ? "You" : formatAddress(address)}
                             </div>
@@ -1007,6 +1185,42 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                                 CREATOR
                               </div>
                             )}
+                            {isWinner && (
+                              <div className="text-yellow-300 text-[10px] mt-1 font-black">
+                                🏆 WINNER
+                              </div>
+                            )}
+                            {isEliminated && (
+                              <div className="text-red-400 text-[10px] mt-1">
+                                ❌ Eliminated
+                              </div>
+                            )}
+                            {/* Show choice during active round */}
+                            {currentGame.status === GameStatus.InProgress &&
+                              !isEliminated &&
+                              hasMadeChoice &&
+                              playerChoice !== undefined && (
+                                <div className="mt-1 text-[10px]">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full ${
+                                      playerChoice === Choice.Head
+                                        ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                                        : "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                                    }`}
+                                  >
+                                    {playerChoice === Choice.Head
+                                      ? "👤 HEADS"
+                                      : "🎯 TAILS"}
+                                  </span>
+                                </div>
+                              )}
+                            {currentGame.status === GameStatus.InProgress &&
+                              !isEliminated &&
+                              !hasMadeChoice && (
+                                <div className="mt-1 text-[10px] text-gray-500">
+                                  Waiting...
+                                </div>
+                              )}
                           </div>
                         </div>
                       );
