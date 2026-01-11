@@ -187,6 +187,8 @@ export function GameList() {
 
   const [isJoining, setIsJoining] = React.useState<string | null>(null);
 
+  const router = useRouter();
+
   const handleJoin = React.useCallback(
     async (gameId: string, entryFee: string) => {
       setIsJoining(gameId);
@@ -195,6 +197,10 @@ export function GameList() {
         if (success) {
           // Refresh games after successful join
           await refreshGames();
+          // Navigate to game waiting room after successful join
+          setTimeout(() => {
+            router.push(`/dashboard/games/${gameId}`);
+          }, 1000);
         }
       } catch (err) {
         console.error("Failed to join game:", err);
@@ -202,15 +208,7 @@ export function GameList() {
         setIsJoining(null);
       }
     },
-    [joinGame, refreshGames]
-  );
-
-  // Filter games by status for display
-  const waitingGames = activeGames.filter(
-    (g) => g.status === GameStatus.Waiting || g.status === GameStatus.Countdown
-  );
-  const liveGames = activeGames.filter(
-    (g) => g.status === GameStatus.InProgress
+    [joinGame, refreshGames, router]
   );
 
   if (isLoading && games.length === 0) {
@@ -279,46 +277,47 @@ export function GameList() {
           </div>
         )}
 
-        {/* Featured/Live Games */}
-        {liveGames.length > 0 && (
+        {/* All Active Games - Single Section */}
+        {activeGames.length > 0 && (
           <div className="mb-8 lg:mb-12">
             <h2 className="text-xl lg:text-2xl font-black tracking-tight mb-4 lg:mb-6">
-              Live Now
+              Active Games
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-              {liveGames.map((game) => (
-                <GameCard
-                  key={game.gameId}
-                  game={game}
-                  onJoin={handleJoin}
-                  isJoining={isJoining}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Waiting Games */}
-        {waitingGames.length > 0 && (
-          <div className="mb-8 lg:mb-12">
-            <h2 className="text-xl lg:text-2xl font-black tracking-tight mb-4 lg:mb-6">
-              {liveGames.length > 0 ? "Available to Join" : "Active Games"}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-              {waitingGames.map((game) => (
-                <GameCard
-                  key={game.gameId}
-                  game={game}
-                  onJoin={handleJoin}
-                  isJoining={isJoining}
-                />
-              ))}
+              {/* Sort games: InProgress first, then Countdown, then Waiting, then by player count */}
+              {activeGames
+                .sort((a, b) => {
+                  // InProgress games first
+                  if (a.status === GameStatus.InProgress && b.status !== GameStatus.InProgress) {
+                    return -1;
+                  }
+                  if (b.status === GameStatus.InProgress && a.status !== GameStatus.InProgress) {
+                    return 1;
+                  }
+                  // Countdown games second
+                  if (a.status === GameStatus.Countdown && b.status !== GameStatus.Countdown) {
+                    return -1;
+                  }
+                  if (b.status === GameStatus.Countdown && a.status !== GameStatus.Countdown) {
+                    return 1;
+                  }
+                  // Then sort by player count (descending)
+                  return b.currentPlayerCount - a.currentPlayerCount;
+                })
+                .map((game) => (
+                  <GameCard
+                    key={game.gameId}
+                    game={game}
+                    onJoin={handleJoin}
+                    isJoining={isJoining}
+                  />
+                ))}
             </div>
           </div>
         )}
 
         {/* No Games */}
-        {games.length === 0 && !isLoading && (
+        {activeGames.length === 0 && games.length === 0 && !isLoading && (
           <div className="text-center py-20">
             <Icon name="games" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <h3 className="text-xl font-black mb-2">No games found</h3>
