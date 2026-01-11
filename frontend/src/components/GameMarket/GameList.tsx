@@ -136,9 +136,19 @@ function GameCard({
             onClick={handleCardClick}
             className="w-full h-10 lg:h-12 rounded-xl bg-primary/20 border border-primary/30 text-primary font-black text-sm tracking-wide hover:bg-primary/30 transition-colors flex items-center justify-center gap-2"
           >
-            <Icon name="check_circle" />
-            View Waiting Room
-            <Icon name="arrow_forward" className="text-sm" />
+            {game.status === GameStatus.InProgress ? (
+              <>
+                <Icon name="play_circle" />
+                Play Now
+                <Icon name="arrow_forward" className="text-sm" />
+              </>
+            ) : (
+              <>
+                <Icon name="check_circle" />
+                View Game
+                <Icon name="arrow_forward" className="text-sm" />
+              </>
+            )}
           </button>
         ) : game.canJoin ? (
           <button

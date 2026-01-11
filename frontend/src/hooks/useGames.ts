@@ -723,10 +723,18 @@ export function useGames(walletAddress?: string): UseGamesReturn {
   );
 
   const activeGames = games.filter(
-    (game) =>
-      game.status === GameStatus.Waiting ||
-      game.status === GameStatus.Countdown ||
-      game.status === GameStatus.InProgress
+    (game) => {
+      // Always include games the user has joined (regardless of status)
+      if (walletAddress && game.isPlayer) {
+        return true;
+      }
+      // Include active games (Waiting, Countdown, InProgress)
+      return (
+        game.status === GameStatus.Waiting ||
+        game.status === GameStatus.Countdown ||
+        game.status === GameStatus.InProgress
+      );
+    }
   );
 
   return {
