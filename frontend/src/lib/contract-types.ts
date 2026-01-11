@@ -20,6 +20,7 @@ export enum GameStatus {
   InProgress = 1,
   Completed = 2,
   Cancelled = 3,
+  Countdown = 4, // Countdown started, accepting more players
 }
 
 export enum Choice {
