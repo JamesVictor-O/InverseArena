@@ -170,21 +170,61 @@ function useIsDesktop() {
   return isDesktop;
 }
 
+const ONBOARDING_STORAGE_KEY = "inverse-arena-onboarding-completed";
+
 export default function DashboardClient() {
-  const [tutorialStep, setTutorialStep] = React.useState<number | null>(0);
+  const [tutorialStep, setTutorialStep] = React.useState<number | null>(null);
+  const [isCheckingOnboarding, setIsCheckingOnboarding] = React.useState(true);
   const isDesktop = useIsDesktop();
   const router = useRouter();
+
+  // Check if onboarding has been completed on mount
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      setIsCheckingOnboarding(false);
+      return;
+    }
+
+    // Check localStorage to see if user has completed onboarding
+    const hasCompletedOnboarding = localStorage.getItem(ONBOARDING_STORAGE_KEY) === "true";
+    
+    if (!hasCompletedOnboarding) {
+      // Small delay to ensure DOM elements are rendered before showing onboarding
+      // This ensures the target elements (wallet-pill, mode-quick, live-games) exist
+      const timer = setTimeout(() => {
+        // Show onboarding for first-time users (Step 1 of 3)
+        setTutorialStep(0);
+        setIsCheckingOnboarding(false);
+      }, 500); // 500ms delay to ensure elements are rendered
+      
+      return () => clearTimeout(timer);
+    } else {
+      // User has already completed onboarding, don't show it
+      setTutorialStep(null);
+      setIsCheckingOnboarding(false);
+    }
+  }, []);
 
   const handleNext = () => {
     if (tutorialStep === null) return;
     if (tutorialStep < ONBOARDING_STEPS.length - 1) {
       setTutorialStep(tutorialStep + 1);
     } else {
+      // Mark onboarding as completed
+      if (typeof window !== "undefined") {
+        localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
+      }
       setTutorialStep(null);
     }
   };
 
-  const handleSkip = () => setTutorialStep(null);
+  const handleSkip = () => {
+    // Mark onboarding as completed even when skipped
+    if (typeof window !== "undefined") {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
+    }
+    setTutorialStep(null);
+  };
 
   const handleModeAction = (mode: LobbyMode) => {
     if (mode.id === "quick") {
@@ -291,7 +331,7 @@ export default function DashboardClient() {
           </main>
         </div>
       ) : null}
-      {tutorialStep !== null && (
+      {!isCheckingOnboarding && tutorialStep !== null && (
         <OnboardingOverlay
           step={ONBOARDING_STEPS[tutorialStep]}
           currentStepIndex={tutorialStep}
