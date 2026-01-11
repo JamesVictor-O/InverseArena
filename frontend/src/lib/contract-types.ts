@@ -78,6 +78,7 @@ export interface GameData {
   maxPlayers: number;
   minPlayers: number;
   startTime?: number;
+  countdownDeadline?: number; // Unix timestamp when countdown ends
   currentRound: number;
   creator: string;
   winner?: string;
@@ -86,6 +87,10 @@ export interface GameData {
   yieldProtocol: YieldProtocol;
   yieldDistributed: boolean;
   playerList: string[];
+  canJoin?: boolean;
+  isPlayer?: boolean;
+  isCreator?: boolean;
+  currentPlayerCount?: number;
 }
 
 export interface PlayerInfo {

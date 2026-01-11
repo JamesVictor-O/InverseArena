@@ -73,7 +73,7 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     useGames(walletAddress || undefined);
 
   const [isJoining, setIsJoining] = React.useState(false);
-  const [countdown, setCountdown] = React.useState<number | null>(null);
+  const [timeRemaining, setTimeRemaining] = React.useState<number | null>(null);
 
   // Normalize gameId (ensure it's a string and valid)
   const normalizedGameId = React.useMemo(() => {
@@ -98,8 +98,15 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
   const [directGame, setDirectGame] = React.useState<GameData | null>(null);
   const [isFetchingDirect, setIsFetchingDirect] = React.useState(false);
 
-  // Use directGame if game is not found in list (define early for use in effects)
-  const currentGame = game || directGame;
+  // Format time remaining as MM:SS
+  const formatTime = React.useCallback((seconds: number): string => {
+    if (seconds < 0) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  }, []);
 
   React.useEffect(() => {
     // Only try to fetch directly if we have a valid gameId, games are loaded, and game is not found
@@ -134,28 +141,58 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     fetchGameById,
   ]);
 
-  // Update countdown timer
+  // Use directGame if game is not found in list
+  const currentGame = game || directGame;
+
+  // Calculate and update countdown timer
   React.useEffect(() => {
     if (
       !currentGame ||
       currentGame.status !== GameStatus.Countdown ||
       !currentGame.countdownDeadline
     ) {
-      setCountdown(null);
+      setTimeRemaining(null);
       return;
     }
 
     const updateCountdown = () => {
       const now = Math.floor(Date.now() / 1000);
-      const remaining = currentGame.countdownDeadline! - now;
-      setCountdown(Math.max(0, remaining));
+      const remaining = Math.max(0, currentGame.countdownDeadline! - now);
+      setTimeRemaining(remaining);
     };
 
+    // Update immediately
     updateCountdown();
+
+    // Update every second
     const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [currentGame]);
+  }, [currentGame?.status, currentGame?.countdownDeadline]);
+
+  // Auto-refresh when countdown hits 0
+  React.useEffect(() => {
+    if (
+      currentGame &&
+      currentGame.status === GameStatus.Countdown &&
+      timeRemaining === 0
+    ) {
+      // Game should have started, refresh to get updated status
+      console.log(
+        `[GameWaitingRoom] Countdown ended for game ${currentGame.gameId}, refreshing...`
+      );
+      setTimeout(() => {
+        refreshGames();
+        fetchGameById(currentGame.gameId);
+      }, 2000); // Wait 2 seconds for blockchain to process
+    }
+  }, [
+    timeRemaining,
+    currentGame?.status,
+    currentGame?.gameId,
+    refreshGames,
+    fetchGameById,
+  ]);
 
   // Auto-refresh game data
   React.useEffect(() => {
@@ -163,10 +200,14 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
 
     const interval = setInterval(() => {
       refreshGames();
+      // Also refresh the specific game if we're viewing it
+      if (currentGame?.gameId) {
+        fetchGameById(currentGame.gameId);
+      }
     }, 5000); // Refresh every 5 seconds
 
     return () => clearInterval(interval);
-  }, [currentGame, refreshGames]);
+  }, [currentGame, refreshGames, fetchGameById]);
 
   const handleJoin = React.useCallback(async () => {
     if (!currentGame) return;
@@ -423,30 +464,75 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                 />
               </div>
 
-              {/* Countdown Timer */}
+              {/* Countdown Timer - Prominent Display */}
               {currentGame.status === GameStatus.Countdown &&
-                countdown !== null && (
-                  <div className="mb-6 p-4 rounded-xl bg-orange-500/10 border border-orange-500/30">
-                    <div className="flex items-center justify-center gap-2">
-                      <Icon name="schedule" className="text-orange-400" />
-                      <span className="text-orange-300 font-black">
-                        Game starts in: {countdown}s
-                      </span>
+                timeRemaining !== null && (
+                  <div className="mb-6 space-y-4">
+                    {/* Warning Banner */}
+                    <div className="rounded-xl bg-orange-500/20 border-2 border-orange-500/50 p-4 animate-pulse">
+                      <div className="flex items-center justify-center gap-3">
+                        <Icon
+                          name="warning"
+                          className="text-orange-400 text-2xl"
+                        />
+                        <span className="text-orange-300 font-black text-lg tracking-wide uppercase">
+                          ⚠️ Game Starting Soon!
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Countdown Timer */}
+                    <div className="rounded-2xl border-2 border-primary/50 bg-primary/10 backdrop-blur-xl p-8 text-center">
+                      <div className="mb-4">
+                        <div className="text-6xl lg:text-7xl font-black text-primary mb-2 font-mono tracking-wider drop-shadow-[0_0_20px_rgba(0,238,255,0.5)]">
+                          {formatTime(timeRemaining)}
+                        </div>
+                        <p className="text-gray-300 font-bold text-sm uppercase tracking-widest">
+                          Game starts in
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-center gap-6 text-sm text-gray-400">
+                        <div className="flex items-center gap-2">
+                          <Icon name="group" className="text-primary" />
+                          <span className="font-black">
+                            {currentGame.currentPlayerCount}/
+                            {currentGame.maxPlayers} Players
+                          </span>
+                        </div>
+                        <span className="text-white/30">•</span>
+                        <div className="flex items-center gap-2">
+                          <Icon name="schedule" className="text-primary" />
+                          <span className="font-black">
+                            {currentGame.maxPlayers -
+                              currentGame.currentPlayerCount}{" "}
+                            slots remaining
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
 
-              {/* Join Button */}
+              {/* Join Button - Enhanced for Countdown */}
               {!currentGame.isPlayer && canJoin && (
                 <button
                   onClick={handleJoin}
                   disabled={isJoining}
-                  className="w-full h-12 lg:h-14 rounded-xl bg-primary text-background font-black text-sm tracking-wide hover:bg-primary-hover transition-colors shadow-[0_0_25px_rgba(0,238,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className={`w-full h-14 lg:h-16 rounded-xl font-black text-base tracking-wide transition-all shadow-[0_0_30px_rgba(0,238,255,0.4)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 ${
+                    currentGame.status === GameStatus.Countdown
+                      ? "bg-orange-500 text-white hover:bg-orange-600 animate-pulse border-2 border-orange-400"
+                      : "bg-primary text-background hover:bg-primary-hover"
+                  }`}
                 >
                   {isJoining ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <Loader2 className="w-6 h-6 animate-spin" />
                       Joining...
+                    </>
+                  ) : currentGame.status === GameStatus.Countdown ? (
+                    <>
+                      ⚡ Join Now!
+                      <Icon name="bolt" className="text-xl" />
                     </>
                   ) : (
                     <>
@@ -465,7 +551,7 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
               )}
             </div>
 
-            {/* Players List */}
+            {/* Players List - With Pulse Animation During Countdown */}
             <div className="rounded-2xl border border-white/10 bg-surface/30 backdrop-blur-xl p-6 lg:p-8">
               <h2 className="text-xl font-black mb-6">
                 Players ({currentGame.currentPlayerCount})
@@ -473,7 +559,13 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
               {currentGame.playerList &&
               Array.isArray(currentGame.playerList) &&
               currentGame.playerList.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div
+                  className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 ${
+                    currentGame.status === GameStatus.Countdown
+                      ? "animate-pulse"
+                      : ""
+                  }`}
+                >
                   {currentGame.playerList
                     .filter((address) => address && address.trim() !== "")
                     .map((address, index) => {
@@ -486,9 +578,11 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                       return (
                         <div
                           key={`${address}-${index}`}
-                          className={`flex flex-col items-center p-4 rounded-xl border ${
+                          className={`flex flex-col items-center p-4 rounded-xl border transition-all ${
                             isYou
                               ? "bg-primary/10 border-primary/30"
+                              : currentGame.status === GameStatus.Countdown
+                              ? "bg-orange-500/10 border-orange-500/30"
                               : "bg-white/5 border-white/10"
                           }`}
                         >
@@ -511,6 +605,32 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                         </div>
                       );
                     })}
+                  {/* Empty slots for remaining players */}
+                  {Array.from({
+                    length:
+                      currentGame.maxPlayers - currentGame.currentPlayerCount,
+                  }).map((_, index) => (
+                    <div
+                      key={`empty-${index}`}
+                      className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed min-h-[100px] ${
+                        currentGame.status === GameStatus.Countdown
+                          ? "border-orange-500/30 bg-orange-500/5 animate-pulse"
+                          : "border-white/20 bg-white/5"
+                      }`}
+                    >
+                      <Icon
+                        name="person_add"
+                        className={`text-2xl mb-2 ${
+                          currentGame.status === GameStatus.Countdown
+                            ? "text-orange-400"
+                            : "text-white/30"
+                        }`}
+                      />
+                      <div className="text-xs text-gray-500 font-bold">
+                        Empty Slot
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-400">
