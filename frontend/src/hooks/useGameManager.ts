@@ -98,6 +98,7 @@ interface UseGameManagerReturn {
     roundNumber: number,
     playerList: string[]
   ) => Promise<{ headCount: number; tailCount: number } | null>;
+  processRoundTimeout: (gameId: string) => Promise<boolean>;
 }
 
 export function useGameManager(): UseGameManagerReturn {
@@ -1314,6 +1315,73 @@ export function useGameManager(): UseGameManagerReturn {
       }
     },
     [getAllPlayersChoices]
+  );
+
+  const processRoundTimeout = useCallback(
+    async (gameId: string): Promise<boolean> => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const signer = await getSigner();
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          signer
+        );
+
+        console.log(
+          `[useGameManager] Processing round timeout for game ${gameId}`
+        );
+
+        // Call processRoundTimeout on the contract
+        const tx = await gameManager.processRoundTimeout(gameId, {
+          gasLimit: 500000,
+        });
+
+        console.log(
+          `[useGameManager] Process round timeout transaction submitted: ${tx.hash}`
+        );
+
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log(
+          `[useGameManager] Process round timeout confirmed in block: ${receipt?.blockNumber}`
+        );
+
+        return true;
+      } catch (err) {
+        console.error("Error processing round timeout:", err);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const error = err as any;
+
+        let errorMessage = "Failed to process round timeout";
+        if (error.reason) {
+          errorMessage = error.reason;
+        } else if (error.data?.message) {
+          errorMessage = error.data.message;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        if (errorMessage.includes("Round not timed out yet")) {
+          errorMessage = "Round has not timed out yet";
+        } else if (errorMessage.includes("Round already processed")) {
+          errorMessage = "Round has already been processed";
+        } else if (errorMessage.includes("Game not in progress")) {
+          errorMessage = "Game is not in progress";
+        } else if (errorMessage.includes("No players remaining")) {
+          errorMessage = "No players remaining";
+        }
+
+        setError(errorMessage);
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [getSigner]
   );
 
   const getWinningsWithdrawn = useCallback(

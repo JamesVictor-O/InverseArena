@@ -922,15 +922,19 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                       </div>
                     )}
 
-                    {/* Round Time Expired */}
+                    {/* Round Time Expired - Auto-process */}
                     {roundTimeRemaining !== null &&
                       roundTimeRemaining === 0 &&
                       !roundInfo?.processed && (
-                        <div className="rounded-xl bg-orange-500/20 border-2 border-orange-500/50 p-4 text-center">
-                          <div className="text-orange-300 font-black text-lg">
-                            ⏱️ Round processing...
-                          </div>
-                        </div>
+                        <RoundTimeoutProcessor
+                          gameId={currentGame.gameId}
+                          roundNumber={currentGame.currentRound}
+                          processRoundTimeout={processRoundTimeout}
+                          onProcessed={async () => {
+                            await refreshGames();
+                            await fetchGameById(currentGame.gameId);
+                          }}
+                        />
                       )}
 
                     {/* Eliminated */}
