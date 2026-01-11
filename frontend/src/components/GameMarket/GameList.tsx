@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Dashboard/Icon";
 import { useGames, GameData } from "@/hooks/useGames";
 import { GameStatus, Currency, CURRENCY_INFO } from "@/lib/contract-types";
@@ -45,8 +46,20 @@ function GameCard({
   const isJoiningThis = isJoining === game.gameId;
   const canJoin = game.canJoin && !game.isPlayer && !isJoiningThis;
 
+  const router = useRouter();
+
+  const handleCardClick = () => {
+    // Navigate to game waiting room when card is clicked
+    router.push(`/dashboard/games/${game.gameId}`);
+  };
+
   return (
-    <div className="group relative rounded-2xl border border-white/10 bg-surface/30 backdrop-blur-xl overflow-hidden hover:border-primary/30 transition-all">
+    <div
+      className={`group relative rounded-2xl border border-white/10 bg-surface/30 backdrop-blur-xl overflow-hidden hover:border-primary/30 transition-all ${
+        game.isPlayer ? "cursor-pointer" : ""
+      }`}
+      onClick={game.isPlayer ? handleCardClick : undefined}
+    >
       <div className="p-4 lg:p-5">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex-1 min-w-0">
@@ -120,11 +133,12 @@ function GameCard({
 
         {game.isPlayer ? (
           <button
-            disabled
-            className="w-full h-10 lg:h-12 rounded-xl bg-white/10 border border-white/20 text-white/50 font-black text-sm tracking-wide cursor-not-allowed flex items-center justify-center gap-2"
+            onClick={handleCardClick}
+            className="w-full h-10 lg:h-12 rounded-xl bg-primary/20 border border-primary/30 text-primary font-black text-sm tracking-wide hover:bg-primary/30 transition-colors flex items-center justify-center gap-2"
           >
             <Icon name="check_circle" />
-            Already Joined
+            View Waiting Room
+            <Icon name="arrow_forward" className="text-sm" />
           </button>
         ) : game.canJoin ? (
           <button
