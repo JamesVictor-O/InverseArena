@@ -500,7 +500,8 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
 
               {/* Countdown Timer - Prominent Display */}
               {currentGame.status === GameStatus.Countdown &&
-                timeRemaining !== null && (
+                timeRemaining !== null &&
+                !gameStarted && (
                   <div className="mb-6 space-y-4">
                     {/* Warning Banner */}
                     <div className="rounded-xl bg-orange-500/20 border-2 border-orange-500/50 p-4 animate-pulse">
@@ -519,10 +520,10 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                     <div className="rounded-2xl border-2 border-primary/50 bg-primary/10 backdrop-blur-xl p-8 text-center">
                       <div className="mb-4">
                         <div className="text-6xl lg:text-7xl font-black text-primary mb-2 font-mono tracking-wider drop-shadow-[0_0_20px_rgba(0,238,255,0.5)]">
-                          {formatTime(timeRemaining)}
+                          {timeRemaining > 0 ? formatTime(timeRemaining) : "00:00"}
                         </div>
                         <p className="text-gray-300 font-bold text-sm uppercase tracking-widest">
-                          Game starts in
+                          {timeRemaining > 0 ? "Game starts in" : "Starting game..."}
                         </p>
                       </div>
                       <div className="flex items-center justify-center gap-6 text-sm text-gray-400">
@@ -544,8 +545,37 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                         </div>
                       </div>
                     </div>
+
+                    {/* Game Starting Indicator */}
+                    {gameStarting && (
+                      <div className="rounded-xl bg-green-500/20 border-2 border-green-500/50 p-4">
+                        <div className="flex items-center justify-center gap-3">
+                          <Loader2 className="w-6 h-6 animate-spin text-green-400" />
+                          <span className="text-green-300 font-black text-lg tracking-wide">
+                            Starting game...
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
+
+              {/* Game Started Success Message */}
+              {gameStarted && currentGame.status === GameStatus.Countdown && (
+                <div className="mb-6 rounded-xl bg-green-500/20 border-2 border-green-500/50 p-6">
+                  <div className="flex items-center justify-center gap-3">
+                    <CheckCircle2 className="w-8 h-8 text-green-400" />
+                    <div className="text-center">
+                      <div className="text-green-300 font-black text-xl mb-1">
+                        🎮 Game Started!
+                      </div>
+                      <div className="text-green-400 text-sm">
+                        Refreshing to show Round 1...
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Join Button - Enhanced for Countdown */}
               {!currentGame.isPlayer && canJoin && (
