@@ -945,7 +945,12 @@ export function useGameManager(): UseGameManagerReturn {
 
       try {
         const signer = await getSigner();
-        const { gameManager } = getContractConfig(signer);
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          signer
+        );
 
         console.log(
           `[useGameManager] Starting game after countdown: ${gameId}`
@@ -1007,7 +1012,12 @@ export function useGameManager(): UseGameManagerReturn {
 
       try {
         const signer = await getSigner();
-        const { gameManager } = getContractConfig(signer);
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          signer
+        );
 
         console.log(
           `[useGameManager] Making choice for game ${gameId}: ${
@@ -1071,7 +1081,12 @@ export function useGameManager(): UseGameManagerReturn {
 
       try {
         const signer = await getSigner();
-        const { gameManager } = getContractConfig(signer);
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          signer
+        );
 
         console.log(
           `[useGameManager] Withdrawing winnings for game ${gameId}, leaveInYield: ${leaveInYield}`
@@ -1133,7 +1148,12 @@ export function useGameManager(): UseGameManagerReturn {
     ): Promise<PlayerInfo | null> => {
       try {
         const signer = await getSigner();
-        const { gameManager } = getContractConfig(signer);
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          signer
+        );
 
         const address = playerAddress || (await signer.getAddress());
 
@@ -1161,7 +1181,12 @@ export function useGameManager(): UseGameManagerReturn {
     async (gameId: string, roundNumber: number): Promise<RoundInfo | null> => {
       try {
         const signer = await getSigner();
-        const { gameManager } = getContractConfig(signer);
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          signer
+        );
 
         const round = await gameManager.rounds(gameId, roundNumber);
 
@@ -1186,7 +1211,12 @@ export function useGameManager(): UseGameManagerReturn {
     async (gameId: string): Promise<boolean> => {
       try {
         const signer = await getSigner();
-        const { gameManager } = getContractConfig(signer);
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          signer
+        );
 
         const withdrawn = await gameManager.winningsWithdrawn(gameId);
         return withdrawn;
