@@ -3,8 +3,12 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./Icon";
-import { LOBBY_MODES, LIVE_GAMES, ONBOARDING_STEPS } from "./constants";
+import { LOBBY_MODES, ONBOARDING_STEPS } from "./constants";
 import { OnboardingOverlay } from "./OnboardingOverlay";
+import { useGames } from "@/hooks/useGames";
+import { useConnectActions } from "@/components/Connect/ConnectActions";
+import { GameStatus, CURRENCY_INFO } from "@/lib/contract-types";
+import { Loader2 } from "lucide-react";
 import styles from "./dashboard.module.css";
 import type { LiveMatch, LobbyMode } from "./types";
 
@@ -100,7 +104,16 @@ function ModeCard({
   );
 }
 
-function LiveGameRow({ game }: { game: LiveMatch }) {
+function LiveGameRow({ 
+  game, 
+  onJoin,
+  onView 
+}: { 
+  game: LiveMatch;
+  onJoin?: (gameId: string) => void;
+  onView?: (gameId: string) => void;
+}) {
+  const router = useRouter();
   const tone =
     game.status.tone === "red"
       ? "bg-red-500/15 border border-red-500/25 text-red-300"
@@ -108,22 +121,35 @@ function LiveGameRow({ game }: { game: LiveMatch }) {
       ? "bg-green-500/15 border border-green-500/25 text-green-300"
       : "bg-white/5 border border-white/10 text-white/60";
 
+  const handleClick = () => {
+    if (game.action?.tone === "primary" && onJoin) {
+      onJoin(game.id);
+    } else if (onView) {
+      onView(game.id);
+    } else {
+      router.push(`/dashboard/games/${game.id}`);
+    }
+  };
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-surface/20 backdrop-blur-xl p-4 flex items-center justify-between gap-4">
-      <div className="flex items-center gap-3 min-w-0">
+    <div 
+      className="rounded-2xl border border-white/10 bg-surface/20 backdrop-blur-xl p-4 flex items-center justify-between gap-4 hover:border-primary/30 transition-all cursor-pointer"
+      onClick={handleClick}
+    >
+      <div className="flex items-center gap-3 min-w-0 flex-1">
         <div className="size-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/60">
           <Icon name="stadia_controller" className="text-[20px]" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
             <div className="font-black text-sm truncate">{game.title}</div>
             <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${tone}`}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${tone}`}
             >
               {game.roundLabel}
             </span>
             <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${tone}`}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${tone}`}
             >
               {game.status.text}
             </span>
@@ -143,11 +169,15 @@ function LiveGameRow({ game }: { game: LiveMatch }) {
 
       {game.action ? (
         <button
-          className={`h-10 px-4 rounded-2xl font-black text-xs tracking-wide ${
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClick();
+          }}
+          className={`h-10 px-4 rounded-2xl font-black text-xs tracking-wide shrink-0 ${
             game.action.tone === "primary"
-              ? "bg-primary text-background shadow-[0_0_15px_rgba(0,238,255,0.2)]"
-              : "bg-white/5 border border-white/10 text-white/70"
-          }`}
+              ? "bg-primary text-background shadow-[0_0_15px_rgba(0,238,255,0.2)] hover:bg-primary-hover"
+              : "bg-white/5 border border-white/10 text-white/70 hover:bg-white/10"
+          } transition-colors`}
         >
           {game.action.label}
         </button>
@@ -177,6 +207,144 @@ export default function DashboardClient() {
   const [isCheckingOnboarding, setIsCheckingOnboarding] = React.useState(true);
   const isDesktop = useIsDesktop();
   const router = useRouter();
+  const { walletAddress } = useConnectActions();
+  const { games, isLoading: isLoadingGames, joinGame, refreshGames } = useGames(
+    walletAddress || undefined
+  );
+  const [isJoining, setIsJoining] = React.useState<string | null>(null);
+
+  // Filter and transform games to LiveMatch format
+  // Show games that are: InProgress, Countdown, or Waiting (but only if they're filling fast)
+  const liveGames: LiveMatch[] = React.useMemo(() => {
+    const activeGames = games.filter(
+      (game) =>
+        game.status === GameStatus.InProgress ||
+        game.status === GameStatus.Countdown ||
+        (game.status === GameStatus.Waiting &&
+          game.currentPlayerCount >= game.minPlayers)
+    );
+
+    // Sort by: InProgress first, then by player count (descending)
+    const sorted = activeGames.sort((a, b) => {
+      if (a.status === GameStatus.InProgress && b.status !== GameStatus.InProgress) {
+        return -1;
+      }
+      if (b.status === GameStatus.InProgress && a.status !== GameStatus.InProgress) {
+        return 1;
+      }
+      return b.currentPlayerCount - a.currentPlayerCount;
+    });
+
+    // Take top 5 games for the dashboard
+    return sorted.slice(0, 5).map((game) => {
+      const currencyInfo = CURRENCY_INFO[game.currency];
+      
+      // Determine status display
+      let roundLabel = "";
+      let statusText = "";
+      let statusTone: "red" | "green" | "gray" = "gray";
+      let actionLabel = "👁";
+      let actionTone: "primary" | "muted" = "muted";
+
+      if (game.status === GameStatus.InProgress) {
+        roundLabel = `ROUND ${game.currentRound}`;
+        statusText = "LIVE";
+        statusTone = "red";
+        actionLabel = "👁";
+        actionTone = "muted";
+      } else if (game.status === GameStatus.Countdown) {
+        roundLabel = "STARTING";
+        statusText = "STARTING";
+        statusTone = "green";
+        if (game.canJoin && !game.isPlayer) {
+          actionLabel = "JOIN";
+          actionTone = "primary";
+        }
+      } else if (game.status === GameStatus.Waiting) {
+        const fillPct = (game.currentPlayerCount / game.maxPlayers) * 100;
+        if (fillPct >= 80) {
+          roundLabel = "FILLING";
+          statusText = "FILLING FAST";
+          statusTone = "green";
+          if (game.canJoin && !game.isPlayer) {
+            actionLabel = "JOIN";
+            actionTone = "primary";
+          }
+        } else {
+          roundLabel = `ROUND 0`;
+          statusText = "WAITING";
+          statusTone = "gray";
+          if (game.canJoin && !game.isPlayer) {
+            actionLabel = "JOIN";
+            actionTone = "primary";
+          }
+        }
+      }
+
+      return {
+        id: game.gameId,
+        title: game.name || `Match #${game.gameId}`,
+        roundLabel,
+        status: { text: statusText, tone: statusTone },
+        players: {
+          current: game.currentPlayerCount,
+          max: game.maxPlayers,
+        },
+        stake: parseFloat(game.entryFee).toFixed(2),
+        currency: currencyInfo.symbol,
+        action: {
+          label: actionLabel,
+          tone: actionTone,
+        },
+      } as LiveMatch;
+    });
+  }, [games]);
+
+  // Auto-refresh games every 10 seconds
+  React.useEffect(() => {
+    if (!walletAddress) return;
+    
+    const interval = setInterval(() => {
+      refreshGames();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [walletAddress, refreshGames]);
+
+  const handleJoinGame = React.useCallback(
+    async (gameId: string) => {
+      if (!walletAddress) {
+        router.push("/dashboard/games");
+        return;
+      }
+
+      const game = games.find((g) => g.gameId === gameId);
+      if (!game || !game.canJoin || game.isPlayer) {
+        router.push(`/dashboard/games/${gameId}`);
+        return;
+      }
+
+      setIsJoining(gameId);
+      try {
+        const success = await joinGame(gameId, game.entryFee);
+        if (success) {
+          router.push(`/dashboard/games/${gameId}`);
+        }
+      } catch (err) {
+        console.error("Failed to join game:", err);
+      } finally {
+        setIsJoining(null);
+      }
+    },
+    [walletAddress, games, joinGame, router]
+  );
+
+  const handleViewGame = React.useCallback(
+    (gameId: string) => {
+      router.push(`/dashboard/games/${gameId}`);
+    },
+    [router]
+  );
 
   // Check if onboarding has been completed on mount
   React.useEffect(() => {
@@ -272,15 +440,34 @@ export default function DashboardClient() {
                         Live Games
                       </h3>
                     </div>
-                    <button className="text-xs font-black text-primary hover:text-[#33f2ff]">
+                    <button
+                      onClick={() => router.push("/dashboard/games")}
+                      className="text-xs font-black text-primary hover:text-[#33f2ff] transition-colors"
+                    >
                       View all
                     </button>
                   </div>
 
                   <div id="live-games" className="space-y-3">
-                    {LIVE_GAMES.map((g) => (
-                      <LiveGameRow key={g.id} game={g} />
-                    ))}
+                    {isLoadingGames ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      </div>
+                    ) : liveGames.length > 0 ? (
+                      liveGames.map((g) => (
+                        <LiveGameRow
+                          key={g.id}
+                          game={g}
+                          onJoin={handleJoinGame}
+                          onView={handleViewGame}
+                        />
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-400 text-sm">
+                        <Icon name="games" className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p>No active games</p>
+                      </div>
+                    )}
                   </div>
                 </aside>
               </div>
@@ -317,15 +504,34 @@ export default function DashboardClient() {
                     LIVE GAMES
                   </div>
                 </div>
-                <button className="text-xs font-black text-primary hover:text-[#33f2ff]">
+                <button
+                  onClick={() => router.push("/dashboard/games")}
+                  className="text-xs font-black text-primary hover:text-[#33f2ff] transition-colors"
+                >
                   VIEW ALL
                 </button>
               </div>
 
               <div id="live-games" className="space-y-3">
-                {LIVE_GAMES.map((g) => (
-                  <LiveGameRow key={g.id} game={g} />
-                ))}
+                {isLoadingGames ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : liveGames.length > 0 ? (
+                  liveGames.map((g) => (
+                    <LiveGameRow
+                      key={g.id}
+                      game={g}
+                      onJoin={handleJoinGame}
+                      onView={handleViewGame}
+                    />
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-400 text-sm">
+                    <Icon name="games" className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>No active games</p>
+                  </div>
+                )}
               </div>
             </div>
           </main>
