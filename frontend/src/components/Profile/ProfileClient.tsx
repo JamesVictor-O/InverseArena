@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
-  Edit,
   Copy,
   Trophy,
   TrendingUp,
@@ -264,25 +263,7 @@ export function ProfileClient() {
             {/* Profile Section */}
             <section>
               <div className="flex flex-col items-center text-center">
-                {/* Avatar */}
-                <div className="relative mb-4">
-                  <div className="w-24 h-24 lg:w-36 lg:h-36 rounded-full border-2 border-primary shadow-neon overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
-                    {profile.avatar ? (
-                      <img
-                        src={profile.avatar}
-                        alt={profile.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-3xl lg:text-5xl font-black">
-                        {profile.name.charAt(0)}
-                      </div>
-                    )}
-                  </div>
-                  <button className="absolute bottom-0 right-0 w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-primary border-2 border-background flex items-center justify-center text-background hover:bg-[#33f2ff] transition-colors shadow-neon">
-                    <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
-                  </button>
-                </div>
+               
 
                 {/* Name & Username */}
                 <h2 className="text-2xl lg:text-4xl font-black mb-2">
