@@ -47,6 +47,7 @@ export interface GameData {
   canJoin: boolean;
   isPlayer: boolean;
   isCreator: boolean;
+  playerList?: string[];
 }
 
 interface UseGamesReturn {
@@ -56,6 +57,7 @@ interface UseGamesReturn {
   isLoading: boolean;
   error: string | null;
   refreshGames: () => Promise<void>;
+  fetchGameById: (gameId: string) => Promise<GameData | null>;
   joinGame: (gameId: string, entryFee: string) => Promise<boolean>;
 }
 
@@ -179,8 +181,30 @@ export function useGames(walletAddress?: string): UseGamesReturn {
               // Get players list
               let playerList: string[] = [];
               try {
-                playerList = await gameManager.getGamePlayers(gameId);
-              } catch {
+                const players = await gameManager.getGamePlayers(gameId);
+                // Handle both array and tuple return formats
+                if (Array.isArray(players)) {
+                  playerList = players.filter(
+                    (addr) => addr && addr !== ethers.ZeroAddress
+                  );
+                } else if (players && typeof players === "object") {
+                  // Might be a tuple-like object
+                  playerList = Object.values(players).filter(
+                    (addr) =>
+                      addr &&
+                      typeof addr === "string" &&
+                      addr !== ethers.ZeroAddress
+                  ) as string[];
+                }
+                console.log(
+                  `Fetched ${playerList.length} players for game ${gameId}:`,
+                  playerList
+                );
+              } catch (err) {
+                console.warn(
+                  `Failed to fetch players for game ${gameId}:`,
+                  err
+                );
                 // Game might not have players yet
               }
 
@@ -256,8 +280,7 @@ export function useGames(walletAddress?: string): UseGamesReturn {
               const canJoin =
                 status === GameStatus.Waiting ||
                 status === GameStatus.Countdown;
-              const isCreator =
-                creator?.toLowerCase() === walletAddress?.toLowerCase();
+              // Note: isCreator will be recalculated after fetching actualCreator from games mapping
 
               // Check countdown deadline if in countdown status
               let countdownDeadline: number | undefined;
@@ -272,13 +295,33 @@ export function useGames(walletAddress?: string): UseGamesReturn {
                 }
               }
 
-              // Get startTime from the game struct (need to fetch games mapping)
+              // Get additional data from games mapping (creator, startTime)
+              let actualCreator = creator;
               let startTime = 0;
               try {
                 const gameStruct = await gameManager.games(gameId);
+                actualCreator = gameStruct.creator || creator || "";
+                // Handle different return formats
+                if (!actualCreator || actualCreator === "") {
+                  // Try accessing as array index or property
+                  actualCreator =
+                    gameStruct[0] || gameStruct.creator || creator || "";
+                }
                 startTime = Number(gameStruct.startTime || 0);
-              } catch {
-                // Could not fetch startTime
+                console.log(
+                  `[fetchGames] Creator for game ${gameId}:`,
+                  actualCreator
+                );
+              } catch (err) {
+                console.warn(
+                  `[fetchGames] Failed to fetch games mapping for game ${gameId}:`,
+                  err
+                );
+                // Could not fetch from games mapping, use creator from gameData if available
+                if (!actualCreator) {
+                  // Try to extract creator from gameData if available
+                  actualCreator = creator || "";
+                }
               }
 
               return {
@@ -293,7 +336,7 @@ export function useGames(walletAddress?: string): UseGamesReturn {
                 startTime,
                 countdownDeadline,
                 currentRound: Number(currentRound || 0),
-                creator,
+                creator: actualCreator,
                 winner:
                   winner && winner !== ethers.ZeroAddress ? winner : undefined,
                 totalPrizePool: ethers.formatUnits(
@@ -311,7 +354,12 @@ export function useGames(walletAddress?: string): UseGamesReturn {
                 currentPlayerCount: playerList.length,
                 canJoin,
                 isPlayer,
-                isCreator,
+                isCreator:
+                  actualCreator && walletAddress
+                    ? actualCreator.toLowerCase() ===
+                      walletAddress.toLowerCase()
+                    : false,
+                playerList: playerList || [], // Add playerList to the returned object
               };
             } catch (err) {
               // Game doesn't exist or error fetching - skip it
@@ -340,6 +388,215 @@ export function useGames(walletAddress?: string): UseGamesReturn {
       setIsLoading(false);
     }
   }, [walletAddress]);
+
+  // Fetch a single game by ID
+  const fetchGameById = useCallback(
+    async (gameId: string): Promise<GameData | null> => {
+      try {
+        // Validate gameId before processing
+        if (
+          !gameId ||
+          gameId === "undefined" ||
+          gameId === "null" ||
+          String(gameId).trim() === ""
+        ) {
+          console.error(`Invalid game ID: ${gameId}`);
+          return null;
+        }
+
+        const provider = new ethers.JsonRpcProvider(
+          process.env.NEXT_PUBLIC_RPC_URL || "https://rpc.sepolia.mantle.xyz"
+        );
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          provider
+        );
+
+        const gameIdNum = Number(gameId);
+        if (isNaN(gameIdNum) || gameIdNum < 0) {
+          console.error(`Invalid game ID (not a valid number): ${gameId}`);
+          return null;
+        }
+
+        // Fetch the specific game
+        const gameData = await gameManager.getGame(gameIdNum);
+
+        // Handle tuple return from contract (same logic as in fetchGames)
+        const returnedGameId =
+          gameData.gameId_?.toString() || gameData[0]?.toString() || gameId;
+
+        // Get player list
+        let playerList: string[] = [];
+        try {
+          const players = await gameManager.getGamePlayers(gameIdNum);
+          // Handle both array and tuple return formats
+          if (Array.isArray(players)) {
+            playerList = players.filter(
+              (addr) => addr && addr !== ethers.ZeroAddress
+            );
+          } else if (players && typeof players === "object") {
+            // Might be a tuple-like object
+            playerList = Object.values(players).filter(
+              (addr) =>
+                addr && typeof addr === "string" && addr !== ethers.ZeroAddress
+            ) as string[];
+          }
+          console.log(
+            `[fetchGameById] Fetched ${playerList.length} players for game ${gameIdNum}:`,
+            playerList
+          );
+        } catch (err) {
+          console.warn(
+            `[fetchGameById] Failed to fetch players for game ${gameIdNum}:`,
+            err
+          );
+          // If getGamePlayers fails, playerList stays empty
+        }
+
+        // Extract game data
+        const currency = Number(
+          gameData.currency !== undefined ? gameData.currency : gameData[3]
+        ) as Currency;
+        const status = Number(
+          gameData.status !== undefined ? gameData.status : gameData[2]
+        ) as GameStatus;
+        const mode = Number(
+          gameData.mode !== undefined ? gameData.mode : gameData[1]
+        ) as GameMode;
+
+        const entryFee =
+          gameData.entryFee !== undefined ? gameData.entryFee : gameData[4];
+        const maxPlayers =
+          gameData.maxPlayers !== undefined ? gameData.maxPlayers : gameData[5];
+        const currentRound =
+          gameData.currentRound !== undefined
+            ? gameData.currentRound
+            : gameData[6];
+        const winner =
+          gameData.winner !== undefined ? gameData.winner : gameData[7];
+        const totalPrizePool =
+          gameData.totalPrizePool !== undefined
+            ? gameData.totalPrizePool
+            : gameData[8];
+        const yieldAccumulated =
+          gameData.yieldAccumulated !== undefined
+            ? gameData.yieldAccumulated
+            : gameData[9];
+        const playerCount =
+          gameData.playerCount !== undefined
+            ? gameData.playerCount
+            : gameData[10];
+        const gameName =
+          gameData.gameName !== undefined
+            ? gameData.gameName
+            : gameData[11] || "";
+
+        const entryFeeDecimals = currency === Currency.USDT0 ? 6 : 18;
+        const entryFeeFormatted = ethers.formatUnits(
+          entryFee,
+          entryFeeDecimals
+        );
+
+        // Get additional data from games mapping
+        let creator = "";
+        let startTime = 0;
+        let countdownDeadline: number | undefined;
+
+        try {
+          const gameStruct = await gameManager.games(gameIdNum);
+          creator = gameStruct.creator || "";
+          // Handle different return formats
+          if (!creator || creator === "") {
+            // Try accessing as array index or property
+            creator = gameStruct[0] || gameStruct.creator || "";
+          }
+          startTime = gameStruct.startTime ? Number(gameStruct.startTime) : 0;
+          console.log(
+            `[fetchGameById] Creator for game ${gameIdNum}:`,
+            creator
+          );
+
+          // Check countdown if in countdown status
+          if (status === GameStatus.Countdown) {
+            try {
+              const countdownRemaining =
+                await gameManager.getCountdownTimeRemaining(gameIdNum);
+              const currentTime = Math.floor(Date.now() / 1000);
+              countdownDeadline = currentTime + Number(countdownRemaining);
+            } catch {
+              // Could not fetch countdown
+            }
+          }
+        } catch {
+          // Could not fetch from games mapping
+        }
+
+        // Determine if user can join and if they're a player/creator
+        const canJoin =
+          status === GameStatus.Waiting || status === GameStatus.Countdown;
+        const isPlayer = walletAddress
+          ? playerList.some(
+              (addr) => addr.toLowerCase() === walletAddress.toLowerCase()
+            )
+          : false;
+        const isCreator = walletAddress
+          ? creator.toLowerCase() === walletAddress.toLowerCase()
+          : false;
+
+        const game: GameData = {
+          gameId: returnedGameId,
+          mode,
+          status,
+          currency,
+          currencyAddress:
+            currency === Currency.USDT0
+              ? getContractAddresses().USDT0
+              : getContractAddresses().METH,
+          entryFee: entryFeeFormatted,
+          maxPlayers: Number(maxPlayers),
+          minPlayers: 4,
+          startTime,
+          countdownDeadline,
+          currentRound: Number(currentRound || 0),
+          creator,
+          winner: winner && winner !== ethers.ZeroAddress ? winner : undefined,
+          totalPrizePool: ethers.formatUnits(
+            totalPrizePool || 0,
+            entryFeeDecimals
+          ),
+          yieldAccumulated: ethers.formatUnits(
+            yieldAccumulated || 0,
+            entryFeeDecimals
+          ),
+          yieldProtocol: 0,
+          yieldDistributed: false,
+          name: gameName || `Game #${gameId}`,
+          playerCount: Number(playerCount || playerList.length),
+          currentPlayerCount: playerList.length,
+          canJoin,
+          isPlayer,
+          isCreator,
+          playerList: playerList || [],
+        };
+
+        return game;
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error(`Failed to fetch game ${gameId}:`, err);
+        if (
+          errorMessage?.includes("Game does not exist") ||
+          errorMessage?.includes("Invalid game") ||
+          errorMessage?.includes("validGame")
+        ) {
+          return null;
+        }
+        return null;
+      }
+    },
+    [walletAddress]
+  );
 
   // Join a game
   const joinGame = useCallback(
@@ -479,6 +736,7 @@ export function useGames(walletAddress?: string): UseGamesReturn {
     isLoading,
     error,
     refreshGames,
+    fetchGameById,
     joinGame,
   };
 }
