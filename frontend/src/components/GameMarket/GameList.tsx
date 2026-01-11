@@ -139,7 +139,7 @@ function GameCard({
             {game.status === GameStatus.InProgress ? (
               <>
                 <Icon name="play_circle" />
-                Play Now
+                Play
                 <Icon name="arrow_forward" className="text-sm" />
               </>
             ) : (
