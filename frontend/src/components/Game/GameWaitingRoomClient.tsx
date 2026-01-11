@@ -6,8 +6,9 @@ import { Icon } from "@/components/Dashboard/Icon";
 import { useGames, GameData } from "@/hooks/useGames";
 import { GameStatus, Currency, CURRENCY_INFO } from "@/lib/contract-types";
 import { useConnectActions } from "@/components/Connect/ConnectActions";
+import { useGameManager } from "@/hooks/useGameManager";
 import { Avatar } from "./Avatar";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 
 function ProgressBar({ value, max }: { value: number; max: number }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
@@ -71,19 +72,20 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
   const { walletAddress } = useConnectActions();
   const { games, isLoading, error, refreshGames, fetchGameById, joinGame } =
     useGames(walletAddress || undefined);
+  const { startGameAfterCountdown, isLoading: isStartingGame } =
+    useGameManager();
 
   const [isJoining, setIsJoining] = React.useState(false);
   const [timeRemaining, setTimeRemaining] = React.useState<number | null>(null);
+  const [gameStarting, setGameStarting] = React.useState(false);
+  const [gameStarted, setGameStarted] = React.useState(false);
 
-  // Normalize gameId (ensure it's a string and valid)
   const normalizedGameId = React.useMemo(() => {
     if (!gameId || gameId === "undefined" || gameId === "null") {
       return null;
     }
     return String(gameId);
   }, [gameId]);
-
-  // Find the game by ID (try both string and number comparison)
   const game = React.useMemo(() => {
     if (!normalizedGameId || !games || games.length === 0) return undefined;
     return games.find(
@@ -170,28 +172,62 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     return () => clearInterval(interval);
   }, [currentGame?.status, currentGame?.countdownDeadline]);
 
-  // Auto-refresh when countdown hits 0
+  // Auto-start game when countdown hits 0
   React.useEffect(() => {
     if (
       currentGame &&
       currentGame.status === GameStatus.Countdown &&
-      timeRemaining === 0
+      timeRemaining === 0 &&
+      !gameStarting &&
+      !gameStarted
     ) {
-      // Game should have started, refresh to get updated status
-      console.log(
-        `[GameWaitingRoom] Countdown ended for game ${currentGame.gameId}, refreshing...`
-      );
-      setTimeout(() => {
-        refreshGames();
-        fetchGameById(currentGame.gameId);
-      }, 2000); // Wait 2 seconds for blockchain to process
+      const startGame = async () => {
+        console.log(
+          `[GameWaitingRoom] Countdown ended for game ${currentGame.gameId}, starting game...`
+        );
+        setGameStarting(true);
+
+        try {
+          const success = await startGameAfterCountdown(currentGame.gameId);
+
+          if (success) {
+            setGameStarted(true);
+            // Wait a moment for blockchain to process, then refresh
+            setTimeout(async () => {
+              await refreshGames();
+              await fetchGameById(currentGame.gameId);
+              setGameStarting(false);
+            }, 3000); // Wait 3 seconds for blockchain to process
+          } else {
+            // If it failed, just refresh to check status
+            setGameStarting(false);
+            setTimeout(async () => {
+              await refreshGames();
+              await fetchGameById(currentGame.gameId);
+            }, 2000);
+          }
+        } catch (err) {
+          console.error("Failed to start game:", err);
+          setGameStarting(false);
+          // Still refresh to check if someone else started it
+          setTimeout(async () => {
+            await refreshGames();
+            await fetchGameById(currentGame.gameId);
+          }, 2000);
+        }
+      };
+
+      startGame();
     }
   }, [
     timeRemaining,
     currentGame?.status,
     currentGame?.gameId,
+    gameStarting,
+    gameStarted,
     refreshGames,
     fetchGameById,
+    startGameAfterCountdown,
   ]);
 
   // Auto-refresh game data
@@ -276,8 +312,6 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
       </div>
     );
   }
-
-  // Show "not found" only if games are loaded and still no game found
   if (!isLoading && !isFetchingDirect && games.length > 0 && !currentGame) {
     return (
       <div className="min-h-screen bg-background text-white flex items-center justify-center">

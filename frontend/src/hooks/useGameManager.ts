@@ -46,6 +46,7 @@ interface UseGameManagerReturn {
   stakeAsCreator: (amount: number) => Promise<boolean>;
   unstakeCreator: () => Promise<boolean>;
   getCreatorStake: () => Promise<CreatorStakeInfo | null>;
+  startGameAfterCountdown: (gameId: string) => Promise<boolean>;
 }
 
 export function useGameManager(): UseGameManagerReturn {
@@ -911,6 +912,68 @@ export function useGameManager(): UseGameManagerReturn {
       }
     }, [getSigner]);
 
+  const startGameAfterCountdown = useCallback(
+    async (gameId: string): Promise<boolean> => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const signer = await getSigner();
+        const { gameManager } = getContractConfig(signer);
+
+        console.log(
+          `[useGameManager] Starting game after countdown: ${gameId}`
+        );
+
+        // Call startGameAfterCountdown on the contract
+        const tx = await gameManager.startGameAfterCountdown(gameId, {
+          gasLimit: 500000, // Reasonable gas limit for starting game
+        });
+
+        console.log(
+          `[useGameManager] Start game transaction submitted: ${tx.hash}`
+        );
+
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log(
+          `[useGameManager] Start game confirmed in block: ${receipt?.blockNumber}`
+        );
+
+        return true;
+      } catch (err) {
+        console.error("Error starting game after countdown:", err);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const error = err as any;
+
+        // Try to extract revert reason
+        let errorMessage = "Failed to start game";
+        if (error.reason) {
+          errorMessage = error.reason;
+        } else if (error.data?.message) {
+          errorMessage = error.data.message;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        // Check for specific error cases
+        if (errorMessage.includes("Countdown not expired")) {
+          errorMessage = "Countdown has not expired yet";
+        } else if (errorMessage.includes("Not enough players")) {
+          errorMessage = "Not enough players to start the game";
+        } else if (errorMessage.includes("Game not in countdown")) {
+          errorMessage = "Game is not in countdown phase";
+        }
+
+        setError(errorMessage);
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [getSigner]
+  );
+
   return {
     createGame,
     isLoading,
@@ -920,5 +983,6 @@ export function useGameManager(): UseGameManagerReturn {
     stakeAsCreator,
     unstakeCreator,
     getCreatorStake,
+    startGameAfterCountdown,
   };
 }
