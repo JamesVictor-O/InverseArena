@@ -15,6 +15,7 @@ import { useConnectActions } from "@/components/Connect/ConnectActions";
 import { Avatar } from "./Avatar";
 import { Loader2 } from "lucide-react";
 import { DashboardHeader } from "@/components/Shared/DashboardHeader";
+import { StakeModal } from "@/components/Dashboard/StakeModal";
 
 function ProgressBar({ value, max }: { value: number; max: number }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
@@ -39,10 +40,11 @@ export default function QuickPlayLobbyClient() {
   const { games, isLoading, refreshGames, joinGame } = useGames(
     walletAddress || undefined
   );
-  const { createGame, isLoading: isCreating } = useGameManager();
+  const { createGame, isLoading: isCreating, getCreatorStake, stakeAsCreator } = useGameManager();
 
   const [isJoining, setIsJoining] = React.useState<string | null>(null);
   const [selectedGame, setSelectedGame] = React.useState<GameData | null>(null);
+  const [stakeModalOpen, setStakeModalOpen] = React.useState(false);
 
   // Filter Quick Play games (mode = 0) that are waiting or in countdown
   const quickPlayGames = React.useMemo(() => {
@@ -105,10 +107,22 @@ export default function QuickPlayLobbyClient() {
     if (!walletAddress) {
       const connected = await connectWallet();
       if (!connected) return;
+      // Wait a bit for wallet to connect
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     try {
-      // Create a Quick Play game with default settings: 10 USDT0 entry, 10 max players
+      // Check if user has staked
+      const stakeInfo = await getCreatorStake();
+      const hasStake = stakeInfo?.hasStaked ?? false;
+
+      if (!hasStake) {
+        // User hasn't staked - show StakeModal
+        setStakeModalOpen(true);
+        return;
+      }
+
+      // User has staked - create game
       const gameId = await createGame({
         currency: Currency.USDT0,
         entryFee: 10,
@@ -123,7 +137,25 @@ export default function QuickPlayLobbyClient() {
     } catch (err) {
       console.error("Failed to create game:", err);
     }
-  }, [walletAddress, connectWallet, createGame, router]);
+  }, [walletAddress, connectWallet, getCreatorStake, createGame, router]);
+
+  const handleStake = React.useCallback(async (amount: number) => {
+    const success = await stakeAsCreator(amount);
+    if (success) {
+      setStakeModalOpen(false);
+      // After successful stake, create the game
+      const gameId = await createGame({
+        currency: Currency.USDT0,
+        entryFee: 10,
+        maxPlayers: 10,
+        name: "Quick Play",
+      });
+
+      if (gameId && gameId !== "pending") {
+        router.push(`/dashboard/games/${gameId}`);
+      }
+    }
+  }, [stakeAsCreator, createGame, router]);
 
   // Find the most popular game (most players)
   const popularGame = sortedGames[0];
@@ -166,7 +198,7 @@ export default function QuickPlayLobbyClient() {
               <p className="text-gray-400">
                 Jump into a game instantly or create your own
               </p>
-            </div>
+              </div>
 
             {/* Quick Join Section */}
             {popularGame && (
@@ -188,26 +220,26 @@ export default function QuickPlayLobbyClient() {
                     <div>
                       <div className="font-black text-lg">
                         {popularGame.name || `Game #${popularGame.gameId}`}
-                      </div>
+              </div>
                       <div className="text-sm text-gray-400 mt-1">
                         Entry: {popularGame.entryFee}{" "}
                         {CURRENCY_INFO[popularGame.currency].symbol}
-                      </div>
-                    </div>
+              </div>
+                </div>
                     <div className="text-right">
                       <div className="text-2xl font-black text-primary">
                         {popularGame.currentPlayerCount}/
                         {popularGame.maxPlayers}
-                      </div>
+                </div>
                       <div className="text-xs text-gray-400">Players</div>
-                    </div>
-                  </div>
+                </div>
+              </div>
 
                   <ProgressBar
                     value={popularGame.currentPlayerCount}
                     max={popularGame.maxPlayers}
                   />
-                </div>
+              </div>
 
                 <button
                   onClick={() => handleJoinGame(popularGame)}

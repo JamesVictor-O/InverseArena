@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Sidebar } from "@/components/Shared/Sidebar";
 import { DashboardHeader } from "@/components/Shared/DashboardHeader";
 import { FloatingCreateButton } from "@/components/Shared/FloatingCreateButton";
 import { CreateArenaModal } from "@/components/Dashboard/CreateArenaModal";
+import { StakeModal } from "@/components/Dashboard/StakeModal";
 import { useGameManager } from "@/hooks/useGameManager";
+import { useConnectActions } from "@/components/Connect/ConnectActions";
 import { Currency } from "@/lib/contract-types";
 
 export default function DashboardLayout({
@@ -14,7 +16,47 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const { createGame, isLoading, error } = useGameManager();
+  const [stakeModalOpen, setStakeModalOpen] = useState(false);
+  const { createGame, isLoading, error, getCreatorStake, stakeAsCreator } = useGameManager();
+  const { walletAddress, connectWallet } = useConnectActions();
+
+  // Check stake status and open appropriate modal
+  const handleCreateClick = useCallback(async () => {
+    // If wallet not connected, connect first
+    if (!walletAddress) {
+      const connected = await connectWallet();
+      if (!connected) return;
+      // Wait a bit for wallet to connect
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    try {
+      // Check if user has staked
+      const stakeInfo = await getCreatorStake();
+      const hasStake = stakeInfo?.hasStaked ?? false;
+
+      if (!hasStake) {
+        // User hasn't staked - open StakeModal directly
+        setStakeModalOpen(true);
+      } else {
+        // User has staked - open CreateArenaModal
+        setCreateModalOpen(true);
+      }
+    } catch (err) {
+      console.error("Error checking stake:", err);
+      // On error, assume no stake and show StakeModal
+      setStakeModalOpen(true);
+    }
+  }, [walletAddress, connectWallet, getCreatorStake]);
+
+  const handleStake = useCallback(async (amount: number) => {
+    const success = await stakeAsCreator(amount);
+    if (success) {
+      setStakeModalOpen(false);
+      // After successful stake, open CreateArenaModal
+      setCreateModalOpen(true);
+    }
+  }, [stakeAsCreator]);
 
   const handleCreateArena = async (data: {
     name?: string;
@@ -62,11 +104,17 @@ export default function DashboardLayout({
 
   return (
     <>
-      <Sidebar onCreateClick={() => setCreateModalOpen(true)}>
+      <Sidebar onCreateClick={handleCreateClick}>
         <DashboardHeader />
         {children}
       </Sidebar>
-      <FloatingCreateButton onClick={() => setCreateModalOpen(true)} />
+      <FloatingCreateButton onClick={handleCreateClick} />
+      <StakeModal
+        open={stakeModalOpen}
+        onClose={() => setStakeModalOpen(false)}
+        onStake={handleStake}
+        minStake={30} // MIN_CREATOR_STAKE = 30 USDT0
+      />
       <CreateArenaModal
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
