@@ -208,24 +208,40 @@ export default function DashboardClient() {
   const isDesktop = useIsDesktop();
   const router = useRouter();
   const { walletAddress } = useConnectActions();
-  const { games, isLoading: isLoadingGames, joinGame, refreshGames } = useGames(
+  const { games, activeGames, isLoading: isLoadingGames, joinGame, refreshGames } = useGames(
     walletAddress || undefined
   );
   const [isJoining, setIsJoining] = React.useState<string | null>(null);
 
   // Filter and transform games to LiveMatch format
-  // Show games that are: InProgress, Countdown, or Waiting (but only if they're filling fast)
+  // Show all active games (InProgress, Countdown, Waiting)
+  // Use activeGames from hook which already filters properly
   const liveGames: LiveMatch[] = React.useMemo(() => {
-    const activeGames = games.filter(
+    // Use activeGames from hook which includes all active games
+    // Filter out completed/cancelled games (should already be filtered, but double-check)
+    const filteredGames = activeGames.filter(
       (game) =>
-        game.status === GameStatus.InProgress ||
-        game.status === GameStatus.Countdown ||
-        (game.status === GameStatus.Waiting &&
-          game.currentPlayerCount >= game.minPlayers)
+        game.status !== GameStatus.Completed &&
+        game.status !== GameStatus.Cancelled
     );
 
-    // Sort by: InProgress first, then by player count (descending)
-    const sorted = activeGames.sort((a, b) => {
+    // Sort by: InProgress first, then Countdown, then by player count (descending)
+    const sorted = filteredGames.sort((a, b) => {
+      // InProgress games first
+      if (a.status === GameStatus.InProgress && b.status !== GameStatus.InProgress) {
+        return -1;
+      }
+      if (b.status === GameStatus.InProgress && a.status !== GameStatus.InProgress) {
+        return 1;
+      }
+      // Countdown games second
+      if (a.status === GameStatus.Countdown && b.status !== GameStatus.Countdown) {
+        return -1;
+      }
+      if (b.status === GameStatus.Countdown && a.status !== GameStatus.Countdown) {
+        return 1;
+      }
+      // Then by player count (descending)
       if (a.status === GameStatus.InProgress && b.status !== GameStatus.InProgress) {
         return -1;
       }
@@ -298,7 +314,7 @@ export default function DashboardClient() {
         },
       } as LiveMatch;
     });
-  }, [games]);
+  }, [activeGames]);
 
   // Auto-refresh games every 10 seconds
   React.useEffect(() => {
