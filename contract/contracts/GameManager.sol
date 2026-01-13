@@ -10,22 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IYieldVault.sol";
 import "./interfaces/INFTAchievements.sol";
 
-/**
- * @title GameManager - YOUR EXACT LOGIC
- * @notice Inverse Arena game with YOUR EXACT game flow:
- * 
- * GAME START LOGIC:
- * - Min players join → 1 minute countdown starts
- * - During 1 minute: More players can join (up to max)
- * - After 1 minute OR max reached: Game starts
- * 
- * ROUND LOGIC:
- * - Each round: 30 seconds to choose
- * - After 30 seconds: Round auto-processes
- * - Players who didn't choose: Auto-eliminated
- * - Minority choice survives, majority eliminated
- * - Continue until 1 winner remains
- */
+
 contract GameManager is Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
     
