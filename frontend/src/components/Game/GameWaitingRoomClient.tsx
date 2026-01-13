@@ -40,71 +40,56 @@ function RoundTimeoutProcessor({
 }) {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [hasProcessed, setHasProcessed] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (hasProcessed || isProcessing) return;
-
-    const processRound = async () => {
-      setIsProcessing(true);
-      try {
-        const success = await processRoundTimeout(gameId);
-        if (success) {
-          setHasProcessed(true);
-          // Wait a moment for blockchain to process, then refresh
-          setTimeout(async () => {
-            await onProcessed();
-            setIsProcessing(false);
-          }, 3000);
-        } else {
-          setIsProcessing(false);
-          // Still refresh to check if someone else processed it
-          setTimeout(async () => {
-            await onProcessed();
-          }, 2000);
-        }
-      } catch (err) {
-        console.error("Failed to process round timeout:", err);
-        setIsProcessing(false);
-        // Still refresh to check status
-        setTimeout(async () => {
-          await onProcessed();
-        }, 2000);
-      }
-    };
-
-    processRound();
-  }, [
-    gameId,
-    roundNumber,
-    processRoundTimeout,
-    onProcessed,
-    hasProcessed,
-    isProcessing,
-  ]);
+  const handleProcess = React.useCallback(async () => {
+    if (isProcessing || hasProcessed) return;
+    setIsProcessing(true);
+    setError(null);
+    try {
+      const success = await processRoundTimeout(gameId);
+      setHasProcessed(success);
+      // Refresh state after processing attempt
+      await onProcessed();
+    } catch (err) {
+      console.error("Failed to process round timeout:", err);
+      setError("Failed to process round. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [gameId, hasProcessed, isProcessing, onProcessed, processRoundTimeout]);
 
   return (
-    <div className="rounded-xl bg-orange-500/20 border-2 border-orange-500/50 p-4 text-center">
-      <div className="flex items-center justify-center gap-3">
-        {isProcessing ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin text-orange-400" />
-            <div className="text-orange-300 font-black text-lg">
-              Processing round...
-            </div>
-          </>
-        ) : hasProcessed ? (
-          <>
-            <CheckCircle2 className="w-5 h-5 text-green-400" />
-            <div className="text-green-300 font-black text-lg">
-              Round processed! Refreshing...
-            </div>
-          </>
-        ) : (
-          <div className="text-orange-300 font-black text-lg">
-            ⏱️ Round processing...
-          </div>
-        )}
+    <div className="rounded-xl bg-orange-500/20 border-2 border-orange-500/50 p-4 text-center space-y-3">
+      <div className="flex items-center justify-center gap-3 text-orange-300 font-black text-lg">
+        <AlertCircle className="w-5 h-5" />
+        Round time expired
       </div>
+      <p className="text-sm text-orange-100">
+        Someone needs to process the round to continue. You can process it if you
+        want to help advance the game.
+      </p>
+      <button
+        onClick={handleProcess}
+        disabled={isProcessing || hasProcessed}
+        className={`w-full h-11 rounded-xl font-black tracking-wide transition-all ${
+          isProcessing || hasProcessed
+            ? "bg-orange-500/30 border border-orange-400/40 text-orange-100/70 cursor-not-allowed"
+            : "bg-orange-500/70 border border-orange-300/60 text-white hover:bg-orange-500 hover:shadow-[0_0_20px_rgba(251,146,60,0.35)]"
+        }`}
+      >
+        {isProcessing ? (
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Processing...
+          </span>
+        ) : hasProcessed ? (
+          "Processed"
+        ) : (
+          "Process round"
+        )}
+      </button>
+      {error && <div className="text-sm text-red-200">{error}</div>}
     </div>
   );
 }
