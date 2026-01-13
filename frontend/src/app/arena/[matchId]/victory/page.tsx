@@ -8,4 +8,3 @@ export default async function VictoryPage({
   const { matchId } = await params;
   return <ResultVictoryClient matchId={matchId} />;
 }
-
