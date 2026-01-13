@@ -15,12 +15,14 @@ export enum GameMode {
   Private = 2,
 }
 
+// Keep in exact order with GameManager.sol:
+// Waiting(0), Countdown(1), InProgress(2), Completed(3), Cancelled(4)
 export enum GameStatus {
   Waiting = 0,
-  InProgress = 1,
-  Completed = 2,
-  Cancelled = 3,
-  Countdown = 4, // Countdown started, accepting more players
+  Countdown = 1,
+  InProgress = 2,
+  Completed = 3,
+  Cancelled = 4,
 }
 
 export enum Choice {
