@@ -1047,6 +1047,29 @@ export function useGameManager(): UseGameManagerReturn {
           }`
         );
 
+        // First, check round deadline before attempting transaction
+        // Get current game to find current round
+        try {
+          const game = await gameManager.games(gameId);
+          const currentRound = Number(game.currentRound);
+          if (currentRound > 0) {
+            const round = await gameManager.rounds(gameId, currentRound);
+            if (round && round.deadline) {
+              const now = Math.floor(Date.now() / 1000);
+              if (now >= Number(round.deadline)) {
+                throw new Error("Round time expired");
+              }
+            }
+          }
+        } catch (checkErr) {
+          console.warn("[useGameManager] Round deadline check failed:", checkErr);
+          // If it's a "Round time expired" error, throw it
+          if (checkErr instanceof Error && checkErr.message.includes("Round time expired")) {
+            throw checkErr;
+          }
+          // Otherwise continue, let contract validate
+        }
+
         // Call makeChoice on the contract
         const tx = await gameManager.makeChoice(gameId, choice, {
           gasLimit: 500000,
@@ -1061,6 +1084,10 @@ export function useGameManager(): UseGameManagerReturn {
         console.log(
           `[useGameManager] Make choice confirmed in block: ${receipt?.blockNumber}`
         );
+
+        if (!receipt || receipt.status !== 1) {
+          throw new Error("Transaction failed");
+        }
 
         return true;
       } catch (err) {
@@ -1077,7 +1104,10 @@ export function useGameManager(): UseGameManagerReturn {
           errorMessage = error.message;
         }
 
-        if (errorMessage.includes("Choice already made")) {
+        // Handle specific contract errors
+        if (errorMessage.includes("Round time expired") || errorMessage.includes("Round expired")) {
+          errorMessage = "Round time has expired. Please wait for the next round.";
+        } else if (errorMessage.includes("Choice already made")) {
           errorMessage = "You have already made your choice for this round";
         } else if (errorMessage.includes("Round time expired")) {
           errorMessage = "Round time has expired";
