@@ -1032,6 +1032,9 @@ contract GameManagerTest is TestHelpers {
     // Admin Function Tests
     // ============================================
 
+    // Removed setPlatformFee and setCreatorFee functions to reduce contract size
+    // These tests are commented out as the functions no longer exist
+    /*
     function testSetPlatformFee() public {
         vm.prank(owner);
         gameManager.setPlatformFee(300);
@@ -1062,6 +1065,7 @@ contract GameManagerTest is TestHelpers {
         vm.expectRevert("Fee too high");
         gameManager.setCreatorFee(2001); // > 2000 (20%)
     }
+    */
 
     function testUpdateContracts() public {
         YieldVault newVault = new YieldVault(
