@@ -357,9 +357,16 @@ export default function DashboardClient() {
 
   const handleViewGame = React.useCallback(
     (gameId: string) => {
-      router.push(`/dashboard/games/${gameId}`);
+      // Find the game to check its status
+      const game = games.find((g) => g.gameId === gameId);
+      // For InProgress games where user is a player, route to arena
+      if (game?.status === GameStatus.InProgress && game.isPlayer) {
+        router.push(`/arena/${gameId}`);
+      } else {
+        router.push(`/dashboard/games/${gameId}`);
+      }
     },
-    [router]
+    [router, games]
   );
 
   // Check if onboarding has been completed on mount
