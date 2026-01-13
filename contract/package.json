@@ -25,7 +25,7 @@
     "deploy:testnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url mantle_testnet --broadcast --verify",
     "deploy:mainnet": "forge script script/Deploy.s.sol:DeployScript --rpc-url mantle_mainnet --broadcast --verify",
     "verify": "forge verify-contract",
-    "install": "forge install",
+    "install": "command -v forge >/dev/null 2>&1 && forge install || echo 'Forge not found, skipping forge install'",
     "update": "forge update"
   },
   "devDependencies": {
