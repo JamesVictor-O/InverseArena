@@ -11,19 +11,40 @@ import { AlertCircle, Loader2 } from "lucide-react";
 function getStatusTag(game: GameData): { label: string; color: string } {
   switch (game.status) {
     case GameStatus.InProgress:
-      return { label: "LIVE", color: "bg-red-500/15 border-red-500/25 text-red-300" };
+      return {
+        label: "LIVE",
+        color: "bg-red-500/15 border-red-500/25 text-red-300",
+      };
     case GameStatus.Countdown:
-      return { label: "COUNTDOWN", color: "bg-orange-500/15 border-orange-500/25 text-orange-300" };
+      return {
+        label: "COUNTDOWN",
+        color: "bg-orange-500/15 border-orange-500/25 text-orange-300",
+      };
     case GameStatus.Waiting:
-      const fillPct = game.maxPlayers > 0 ? (game.currentPlayerCount / game.maxPlayers) * 100 : 0;
+      const fillPct =
+        game.maxPlayers > 0
+          ? (game.currentPlayerCount / game.maxPlayers) * 100
+          : 0;
       if (fillPct >= 80) {
-        return { label: "FILLING FAST", color: "bg-orange-500/15 border-orange-500/25 text-orange-300" };
+        return {
+          label: "FILLING FAST",
+          color: "bg-orange-500/15 border-orange-500/25 text-orange-300",
+        };
       }
-      return { label: "OPEN", color: "bg-green-500/15 border-green-500/25 text-green-300" };
+      return {
+        label: "OPEN",
+        color: "bg-green-500/15 border-green-500/25 text-green-300",
+      };
     case GameStatus.Completed:
-      return { label: "COMPLETED", color: "bg-gray-500/15 border-gray-500/25 text-gray-300" };
+      return {
+        label: "COMPLETED",
+        color: "bg-gray-500/15 border-gray-500/25 text-gray-300",
+      };
     default:
-      return { label: "UNKNOWN", color: "bg-gray-500/15 border-gray-500/25 text-gray-300" };
+      return {
+        label: "UNKNOWN",
+        color: "bg-gray-500/15 border-gray-500/25 text-gray-300",
+      };
   }
 }
 
@@ -36,6 +57,23 @@ function GameCard({
   onJoin: (gameId: string, entryFee: string) => void;
   isJoining: string | null;
 }) {
+  const [currentTime, setCurrentTime] = React.useState(() =>
+    Math.floor(Date.now() / 1000)
+  );
+
+  // Update current time every second when game is in countdown
+  React.useEffect(() => {
+    if (game.status !== GameStatus.Countdown || !game.countdownDeadline) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCurrentTime(Math.floor(Date.now() / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [game.status, game.countdownDeadline]);
+
   const fillPct =
     game.maxPlayers > 0
       ? Math.min(100, (game.currentPlayerCount / game.maxPlayers) * 100)
@@ -49,8 +87,13 @@ function GameCard({
   const router = useRouter();
 
   const handleCardClick = () => {
-    // Navigate to game waiting room when card is clicked
-    router.push(`/dashboard/games/${game.gameId}`);
+    // For InProgress games, navigate to arena to make choice
+    // For other games, navigate to waiting room
+    if (game.status === GameStatus.InProgress) {
+      router.push(`/arena/${game.gameId}`);
+    } else {
+      router.push(`/dashboard/games/${game.gameId}`);
+    }
   };
 
   return (
@@ -107,7 +150,9 @@ function GameCard({
             <span>
               {game.currentPlayerCount}/{game.maxPlayers} Players
             </span>
-            <span className="font-mono text-primary">{fillPct.toFixed(0)}%</span>
+            <span className="font-mono text-primary">
+              {fillPct.toFixed(0)}%
+            </span>
           </div>
           <div className="h-2 rounded-full bg-white/10 overflow-hidden">
             <div
@@ -120,7 +165,7 @@ function GameCard({
         {game.status === GameStatus.Countdown && game.countdownDeadline && (
           <div className="mb-3 text-xs text-gray-400">
             <Icon name="schedule" className="inline mr-1" />
-            Starts in: {Math.max(0, game.countdownDeadline - Math.floor(Date.now() / 1000))}s
+            Starts in: {Math.max(0, game.countdownDeadline - currentTime)}s
           </div>
         )}
 
@@ -262,7 +307,8 @@ export function GameList() {
             <p className="text-gray-400 text-sm">
               {activeGames.length > 0 ? (
                 <>
-                  {activeGames.length} active game{activeGames.length !== 1 ? "s" : ""}
+                  {activeGames.length} active game
+                  {activeGames.length !== 1 ? "s" : ""}
                   {games.length > activeGames.length && (
                     <> • {games.length} total</>
                   )}
@@ -309,17 +355,29 @@ export function GameList() {
               {activeGames
                 .sort((a, b) => {
                   // InProgress games first
-                  if (a.status === GameStatus.InProgress && b.status !== GameStatus.InProgress) {
+                  if (
+                    a.status === GameStatus.InProgress &&
+                    b.status !== GameStatus.InProgress
+                  ) {
                     return -1;
                   }
-                  if (b.status === GameStatus.InProgress && a.status !== GameStatus.InProgress) {
+                  if (
+                    b.status === GameStatus.InProgress &&
+                    a.status !== GameStatus.InProgress
+                  ) {
                     return 1;
                   }
                   // Countdown games second
-                  if (a.status === GameStatus.Countdown && b.status !== GameStatus.Countdown) {
+                  if (
+                    a.status === GameStatus.Countdown &&
+                    b.status !== GameStatus.Countdown
+                  ) {
                     return -1;
                   }
-                  if (b.status === GameStatus.Countdown && a.status !== GameStatus.Countdown) {
+                  if (
+                    b.status === GameStatus.Countdown &&
+                    a.status !== GameStatus.Countdown
+                  ) {
                     return 1;
                   }
                   // Then sort by player count (descending)
@@ -337,14 +395,14 @@ export function GameList() {
           </div>
         )}
 
-        {/* No Games */}
         {activeGames.length === 0 && games.length === 0 && !isLoading && (
           <div className="text-center py-20">
-            <Icon name="games" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <Icon
+              name="games"
+              className="w-16 h-16 text-gray-600 mx-auto mb-4"
+            />
             <h3 className="text-xl font-black mb-2">No games found</h3>
-            <p className="text-gray-400 mb-6">
-              Be the first to create a game!
-            </p>
+            <p className="text-gray-400 mb-6">Be the first to create a game!</p>
             <button
               onClick={refreshGames}
               className="px-6 py-3 rounded-xl bg-primary text-background font-black hover:bg-primary-hover transition-colors"
