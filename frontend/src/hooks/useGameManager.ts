@@ -51,6 +51,7 @@ interface RoundInfo {
   headCount?: number;
   tailCount?: number;
   survivors?: string[];
+  blockchainTimestamp?: number; // Current blockchain timestamp when fetched
 }
 
 interface PlayerChoiceInfo {
@@ -506,22 +507,16 @@ export function useGameManager(): UseGameManagerReturn {
             }`
           );
         }
-
-        // Check and approve token if needed (for ERC20 tokens)
-        // Approval must be in token's native decimals
         if (currency !== Currency.MNT) {
           await checkAndApproveToken(currency, entryFee);
         }
 
-        // Check balance
         const balance = await getTokenBalance(currency);
         if (parseFloat(balance) < entryFee) {
           throw new Error(
             `Insufficient balance. You have ${balance} ${currencyInfo.symbol}, but need ${entryFee} ${currencyInfo.symbol}`
           );
         }
-
-        // Use provided name or default
         const gameName = params.name || "Quick Play Game";
 
         let tx: ethers.ContractTransactionResponse;
@@ -535,9 +530,6 @@ export function useGameManager(): UseGameManagerReturn {
             }
           );
         } else if (currency === Currency.USDT0) {
-          // USDT0 - use createQuickPlayGameUSDT0
-          // Contract expects entryFee in 6 decimals (USDT0's native decimals)
-          // MIN_ENTRY_FEE_USDT0 = 1 * 10^6, MAX_ENTRY_FEE_USDT0 = 100000 * 10^6
           console.log(`Creating USDT0 game:`);
           console.log(`  Entry fee (human readable): ${entryFee} USDT0`);
           console.log(`  Currency decimals: ${currencyInfo.decimals}`);
@@ -549,7 +541,6 @@ export function useGameManager(): UseGameManagerReturn {
           );
           console.log(`  Max players: ${maxPlayers}`);
 
-          // Verify the conversion is correct
           const expectedValue = BigInt(Math.floor(entryFee * 10 ** 6));
           if (entryFeeTokenUnits !== expectedValue) {
             console.error(
@@ -562,7 +553,7 @@ export function useGameManager(): UseGameManagerReturn {
 
           tx = await gameManager.createQuickPlayGameUSDT0(
             gameName,
-            entryFeeTokenUnits, // MUST be in 6 decimals for USDT0
+            entryFeeTokenUnits,
             maxPlayers
           );
         } else if (currency === Currency.METH) {
@@ -577,7 +568,6 @@ export function useGameManager(): UseGameManagerReturn {
 
         console.log("Transaction submitted:", tx.hash);
 
-        // Wait for transaction confirmation
         const receipt = await tx.wait();
 
         if (!receipt) {
@@ -586,7 +576,6 @@ export function useGameManager(): UseGameManagerReturn {
 
         console.log("Transaction confirmed:", receipt);
 
-        // Extract gameId from event
         const gameCreatedEvent = receipt.logs.find((log: ethers.Log) => {
           try {
             const parsedLog = gameManager.interface.parseLog(log);
@@ -741,8 +730,12 @@ export function useGameManager(): UseGameManagerReturn {
               address: protocolInfo.protocolAddress,
             })}`
           );
-        } catch (vaultError: any) {
-          if (vaultError.message && vaultError.message.includes("disabled")) {
+        } catch (vaultError: unknown) {
+          if (
+            vaultError instanceof Error &&
+            vaultError.message &&
+            vaultError.message.includes("disabled")
+          ) {
             throw vaultError;
           }
           console.warn(
@@ -1033,7 +1026,22 @@ export function useGameManager(): UseGameManagerReturn {
       setError(null);
 
       try {
+        // Validate inputs
+        const gameIdNum = Number(gameId);
+        if (isNaN(gameIdNum) || gameIdNum < 0) {
+          throw new Error("Invalid game ID");
+        }
+
+        if (choice !== Choice.Head && choice !== Choice.Tail) {
+          throw new Error("Invalid choice. Must be Head (0) or Tail (1)");
+        }
+
         const signer = await getSigner();
+        const provider = signer.provider;
+        if (!provider) {
+          throw new Error("Provider not available");
+        }
+
         const gameManagerConfig = getContractConfig("GameManager");
         const gameManager = new ethers.Contract(
           gameManagerConfig.address,
@@ -1047,32 +1055,54 @@ export function useGameManager(): UseGameManagerReturn {
           }`
         );
 
-        // First, check round deadline before attempting transaction
-        // Get current game to find current round
+        // Pre-flight checks using blockchain time for accuracy
         try {
-          const game = await gameManager.games(gameId);
+          // Get current block for accurate timestamp
+          const [game, currentBlock] = await Promise.all([
+            gameManager.games(gameIdNum),
+            provider.getBlock("latest"),
+          ]);
+
+          if (!currentBlock) {
+            throw new Error("Failed to get current block");
+          }
+
+          const blockchainTimestamp = Number(currentBlock.timestamp);
+
+          // Check game status
+          const gameStatus = Number(game.status);
+          if (gameStatus !== 2) {
+            // 2 = InProgress
+            throw new Error("Game not in progress");
+          }
+
+          // Check round deadline using blockchain time
           const currentRound = Number(game.currentRound);
           if (currentRound > 0) {
-            const round = await gameManager.rounds(gameId, currentRound);
+            const round = await gameManager.rounds(gameIdNum, currentRound);
             if (round && round.deadline) {
-              const now = Math.floor(Date.now() / 1000);
-              if (now >= Number(round.deadline)) {
+              const deadline = Number(round.deadline);
+              if (blockchainTimestamp >= deadline) {
                 throw new Error("Round time expired");
               }
             }
           }
         } catch (checkErr) {
-          console.warn("[useGameManager] Round deadline check failed:", checkErr);
-          // If it's a "Round time expired" error, throw it
-          if (checkErr instanceof Error && checkErr.message.includes("Round time expired")) {
+          console.warn("[useGameManager] Pre-flight check failed:", checkErr);
+          // Re-throw validation errors
+          if (checkErr instanceof Error) {
             throw checkErr;
           }
           // Otherwise continue, let contract validate
         }
 
-        // Call makeChoice on the contract
-        const tx = await gameManager.makeChoice(gameId, choice, {
-          gasLimit: 500000,
+        // Convert gameId to BigInt for contract call (ABI expects uint256)
+        const gameIdBigInt = BigInt(gameIdNum);
+        // Choice is already a number (0 or 1), which matches uint8 enum
+
+        // Call makeChoice on the contract - ABI: makeChoice(uint256 gameId, uint8 choice)
+        const tx = await gameManager.makeChoice(gameIdBigInt, choice, {
+          gasLimit: 500000, // Set gas limit to prevent estimation issues
         });
 
         console.log(
@@ -1086,7 +1116,73 @@ export function useGameManager(): UseGameManagerReturn {
         );
 
         if (!receipt || receipt.status !== 1) {
-          throw new Error("Transaction failed");
+          // Transaction reverted - try to decode the revert reason
+          let revertReason = "Transaction reverted";
+
+          try {
+            // Try to simulate the call to get the revert reason
+            await gameManager.makeChoice.staticCall(gameIdBigInt, choice);
+            // If staticCall succeeds, the revert happened during execution
+            revertReason =
+              "Transaction reverted during execution (check contract state)";
+          } catch (staticCallError: any) {
+            // Extract revert reason from static call error
+            if (staticCallError.reason) {
+              revertReason = staticCallError.reason;
+            } else if (staticCallError.data) {
+              try {
+                // Try to parse as custom error
+                const decoded = gameManager.interface.parseError(
+                  staticCallError.data
+                );
+                if (decoded) {
+                  revertReason = decoded.name;
+                }
+              } catch {
+                // Try to decode as a revert string (Error(string))
+                if (
+                  typeof staticCallError.data === "string" &&
+                  staticCallError.data.startsWith("0x")
+                ) {
+                  try {
+                    // Error(string) selector is 0x08c379a0, data after that is the string
+                    if (staticCallError.data.startsWith("0x08c379a0")) {
+                      const reason = ethers.AbiCoder.defaultAbiCoder().decode(
+                        ["string"],
+                        "0x" + staticCallError.data.slice(10)
+                      );
+                      if (reason && reason[0]) {
+                        revertReason = reason[0];
+                      }
+                    }
+                  } catch {
+                    // Ignore decode errors
+                  }
+                }
+              }
+            } else if (staticCallError.message) {
+              revertReason = staticCallError.message;
+            }
+          }
+
+          console.error(
+            `[useGameManager] Transaction reverted: ${revertReason}`
+          );
+          throw new Error(revertReason);
+        }
+
+        // Verify the ChoiceMade event was emitted
+        const choiceMadeEvent = receipt.logs.find((log: ethers.Log) => {
+          try {
+            const parsed = gameManager.interface.parseLog(log);
+            return parsed?.name === "ChoiceMade";
+          } catch {
+            return false;
+          }
+        });
+
+        if (choiceMadeEvent) {
+          console.log("[useGameManager] ChoiceMade event confirmed");
         }
 
         return true;
@@ -1096,25 +1192,77 @@ export function useGameManager(): UseGameManagerReturn {
         const error = err as any;
 
         let errorMessage = "Failed to make choice";
+
+        // Extract error message from various error formats
         if (error.reason) {
           errorMessage = error.reason;
         } else if (error.data?.message) {
           errorMessage = error.data.message;
         } else if (error.message) {
           errorMessage = error.message;
+        } else if (error.error?.message) {
+          errorMessage = error.error.message;
         }
 
-        // Handle specific contract errors
-        if (errorMessage.includes("Round time expired") || errorMessage.includes("Round expired")) {
-          errorMessage = "Round time has expired. Please wait for the next round.";
-        } else if (errorMessage.includes("Choice already made")) {
-          errorMessage = "You have already made your choice for this round";
-        } else if (errorMessage.includes("Round time expired")) {
-          errorMessage = "Round time has expired";
-        } else if (errorMessage.includes("Already eliminated")) {
-          errorMessage = "You have been eliminated from this game";
-        } else if (errorMessage.includes("Game not in progress")) {
-          errorMessage = "Game is not in progress";
+        // Parse contract revert reasons
+        if (error.data) {
+          try {
+            const gameManagerConfig = getContractConfig("GameManager");
+            const tempContract = new ethers.Contract(
+              gameManagerConfig.address,
+              gameManagerConfig.abi,
+              signer.provider || undefined
+            );
+            const decoded = tempContract.interface.parseError(error.data);
+            if (decoded) {
+              errorMessage = decoded.name || errorMessage;
+            }
+          } catch {
+            // Ignore parsing errors
+          }
+        }
+
+        // Map contract errors to user-friendly messages
+        const errorLower = errorMessage.toLowerCase();
+
+        if (
+          errorLower.includes("round time expired") ||
+          errorLower.includes("round expired")
+        ) {
+          errorMessage =
+            "Round time has expired. Please wait for the next round.";
+        } else if (
+          errorLower.includes("choice already made") ||
+          errorLower.includes("already made")
+        ) {
+          errorMessage = "You have already made your choice for this round.";
+        } else if (
+          errorLower.includes("already eliminated") ||
+          errorLower.includes("eliminated")
+        ) {
+          errorMessage = "You have been eliminated from this game.";
+        } else if (
+          errorLower.includes("game not in progress") ||
+          errorLower.includes("not in progress")
+        ) {
+          errorMessage = "Game is not in progress.";
+        } else if (
+          errorLower.includes("not a player") ||
+          errorLower.includes("not a player")
+        ) {
+          errorMessage = "You are not a player in this game.";
+        } else if (errorLower.includes("invalid choice")) {
+          errorMessage = "Invalid choice. Must be Head (0) or Tail (1).";
+        } else if (
+          errorLower.includes("user rejected") ||
+          errorLower.includes("user denied")
+        ) {
+          errorMessage = "Transaction cancelled. Please try again.";
+        } else if (errorLower.includes("insufficient funds")) {
+          errorMessage = "Insufficient funds for gas fees.";
+        } else if (errorLower.includes("paused")) {
+          errorMessage =
+            "Contract is currently paused. Please try again later.";
         }
 
         setError(errorMessage);
@@ -1233,6 +1381,11 @@ export function useGameManager(): UseGameManagerReturn {
     async (gameId: string, roundNumber: number): Promise<RoundInfo | null> => {
       try {
         const signer = await getSigner();
+        const provider = signer.provider;
+        if (!provider) {
+          throw new Error("Provider not available");
+        }
+
         const gameManagerConfig = getContractConfig("GameManager");
         const gameManager = new ethers.Contract(
           gameManagerConfig.address,
@@ -1240,9 +1393,19 @@ export function useGameManager(): UseGameManagerReturn {
           signer
         );
 
-        const round = await gameManager.rounds(gameId, roundNumber);
+        // Fetch round info and current block in parallel
+        const [round, currentBlock] = await Promise.all([
+          gameManager.rounds(gameId, roundNumber),
+          provider.getBlock("latest"),
+        ]);
 
-        return {
+        if (!currentBlock) {
+          throw new Error("Failed to get current block");
+        }
+
+        const blockchainTimestamp = Number(currentBlock.timestamp);
+
+        const roundInfo: RoundInfo = {
           roundNumber,
           deadline: Number(round.deadline || 0),
           processed: round.processed || false,
@@ -1251,6 +1414,13 @@ export function useGameManager(): UseGameManagerReturn {
               ? Number(round.winningChoice)
               : undefined,
         };
+
+        // Include blockchain timestamp for accurate time calculation
+        if (blockchainTimestamp) {
+          roundInfo.blockchainTimestamp = blockchainTimestamp;
+        }
+
+        return roundInfo;
       } catch (err) {
         console.error("Error getting round info:", err);
         return null;
