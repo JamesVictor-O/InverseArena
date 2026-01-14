@@ -7,8 +7,10 @@ import { LOBBY_MODES, ONBOARDING_STEPS } from "./constants";
 import { OnboardingOverlay } from "./OnboardingOverlay";
 import { useGames } from "@/hooks/useGames";
 import { useConnectActions } from "@/components/Connect/ConnectActions";
+import { useGameManager } from "@/hooks/useGameManager";
 import { GameStatus, CURRENCY_INFO } from "@/lib/contract-types";
 import { Loader2 } from "lucide-react";
+import { StakeModal } from "@/components/Dashboard/StakeModal";
 import styles from "./dashboard.module.css";
 import type { LiveMatch, LobbyMode } from "./types";
 
@@ -25,6 +27,124 @@ function badgeTone(tone: string) {
     default:
       return "bg-white/5 border border-white/10 text-white/70";
   }
+}
+
+function StakeCard({
+  stakeInfo,
+  onStake,
+  onUnstake,
+  isUnstaking,
+  isLoading,
+  walletAddress,
+}: {
+  stakeInfo: {
+    stakedAmount: string;
+    yieldAccumulated: string;
+    timestamp: number;
+    activeGamesCount: number;
+    hasStaked: boolean;
+  } | null;
+  onStake: () => void;
+  onUnstake: () => void;
+  isUnstaking: boolean;
+  isLoading: boolean;
+  walletAddress?: string | null;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface/25 backdrop-blur-xl">
+      <div className="relative p-5 lg:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-black tracking-widest text-yellow-300/90 uppercase">
+                {stakeInfo?.hasStaked ? "STAKED" : "CREATOR STAKE"}
+              </span>
+            </div>
+
+            <div className="mt-2 flex items-center gap-2">
+              <Icon name="account_balance_wallet" className="text-[22px] text-yellow-300" />
+              <div className="text-xl lg:text-2xl font-black tracking-tight italic">
+                STAKE
+              </div>
+            </div>
+          </div>
+
+          {stakeInfo?.hasStaked ? (
+            <button
+              onClick={onUnstake}
+              disabled={isUnstaking || isLoading || stakeInfo.activeGamesCount > 0}
+              className="shrink-0 h-12 px-6 rounded-2xl font-black tracking-wide text-sm transition-all bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isUnstaking ? (
+                "UNSTAKING..."
+              ) : stakeInfo.activeGamesCount > 0 ? (
+                "LOCKED"
+              ) : (
+                "UNSTAKE"
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={onStake}
+              disabled={!walletAddress || isLoading}
+              className="shrink-0 h-12 px-6 rounded-2xl font-black tracking-wide text-sm transition-all bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              STAKE
+            </button>
+          )}
+        </div>
+
+        {stakeInfo?.hasStaked ? (
+          <div className="mt-4 space-y-3">
+            <div className="bg-background/30 rounded-xl p-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/60">Staked</span>
+                <span className="text-sm font-black text-white">
+                  {parseFloat(stakeInfo.stakedAmount).toFixed(2)} USDT0
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/60">Earnings</span>
+                <span className="text-sm font-black text-primary">
+                  {parseFloat(stakeInfo.yieldAccumulated).toFixed(4)} USDT0
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/60">Games Created</span>
+                <span className="text-sm font-black text-white">
+                  {stakeInfo.activeGamesCount}
+                </span>
+              </div>
+            </div>
+            {stakeInfo.activeGamesCount > 0 && (
+              <div className="text-[11px] text-yellow-300/70">
+                {stakeInfo.activeGamesCount} active game{stakeInfo.activeGamesCount !== 1 ? "s" : ""} - complete before unstaking
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-2 text-sm text-white/70">
+            <div className="flex items-center gap-2">
+              <Icon name="add" className="text-[18px] text-yellow-300/80" />
+              <span className="text-[12px]">Create unlimited games</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Icon name="trending_up" className="text-[18px] text-yellow-300/80" />
+              <span className="text-[12px]">Earn 5% APY on stake</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Icon name="payments" className="text-[18px] text-yellow-300/80" />
+              <span className="text-[12px]">10% creator fee per game</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Icon name="info" className="text-[18px] text-yellow-300/80" />
+              <span className="text-[12px]">Minimum: 30 USDT0</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ModeCard({
@@ -211,7 +331,22 @@ export default function DashboardClient() {
   const { games, activeGames, isLoading: isLoadingGames, joinGame, refreshGames } = useGames(
     walletAddress || undefined
   );
+  const {
+    getCreatorStake,
+    stakeAsCreator,
+    unstakeCreator,
+    isLoading: isGameManagerLoading,
+  } = useGameManager();
   const [isJoining, setIsJoining] = React.useState<string | null>(null);
+  const [stakeModalOpen, setStakeModalOpen] = React.useState(false);
+  const [creatorStakeInfo, setCreatorStakeInfo] = React.useState<{
+    stakedAmount: string;
+    yieldAccumulated: string;
+    timestamp: number;
+    activeGamesCount: number;
+    hasStaked: boolean;
+  } | null>(null);
+  const [isUnstaking, setIsUnstaking] = React.useState(false);
 
   // Filter and transform games to LiveMatch format
   // Show all active games (InProgress, Countdown, Waiting)
@@ -316,16 +451,69 @@ export default function DashboardClient() {
     });
   }, [activeGames]);
 
-  // Auto-refresh games every 10 seconds
+  // Auto-refresh games every 10 seconds (silent background refresh)
   React.useEffect(() => {
     if (!walletAddress) return;
     
     const interval = setInterval(() => {
-      refreshGames();
+      refreshGames(true); // Silent refresh - no loading state
     }, 10000);
 
     return () => clearInterval(interval);
   }, [walletAddress, refreshGames]);
+
+  // Fetch creator stake info
+  React.useEffect(() => {
+    if (!walletAddress) {
+      setCreatorStakeInfo(null);
+      return;
+    }
+
+    const fetchStakeInfo = async () => {
+      try {
+        const stakeInfo = await getCreatorStake();
+        setCreatorStakeInfo(stakeInfo);
+      } catch (err) {
+        console.error("Failed to fetch creator stake:", err);
+      }
+    };
+
+    fetchStakeInfo();
+    // Refresh stake info every 10 seconds
+    const interval = setInterval(fetchStakeInfo, 10000);
+    return () => clearInterval(interval);
+  }, [walletAddress, getCreatorStake]);
+
+  const handleStake = React.useCallback(
+    async (amount: number) => {
+      const success = await stakeAsCreator(amount);
+      if (success) {
+        setStakeModalOpen(false);
+        // Refresh stake info after staking
+        const stakeInfo = await getCreatorStake();
+        setCreatorStakeInfo(stakeInfo);
+      }
+    },
+    [stakeAsCreator, getCreatorStake]
+  );
+
+  const handleUnstake = React.useCallback(async () => {
+    if (!walletAddress) return;
+    
+    setIsUnstaking(true);
+    try {
+      const success = await unstakeCreator();
+      if (success) {
+        // Refresh stake info
+        const stakeInfo = await getCreatorStake();
+        setCreatorStakeInfo(stakeInfo);
+      }
+    } catch (err) {
+      console.error("Failed to unstake:", err);
+    } finally {
+      setIsUnstaking(false);
+    }
+  }, [walletAddress, unstakeCreator, getCreatorStake]);
 
   const handleJoinGame = React.useCallback(
     async (gameId: string) => {
@@ -424,8 +612,15 @@ export default function DashboardClient() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-white">
-      {isDesktop ? (
+    <>
+      <StakeModal
+        open={stakeModalOpen}
+        onClose={() => setStakeModalOpen(false)}
+        onStake={handleStake}
+        minStake={30} // MIN_CREATOR_STAKE = 30 USDT0
+      />
+      <div className="min-h-screen bg-background text-white">
+        {isDesktop ? (
         <div className="min-h-screen flex flex-col">
           {/* Desktop content */}
           <main
@@ -453,6 +648,14 @@ export default function DashboardClient() {
                   />
                   <ModeCard mode={LOBBY_MODES[1]} onAction={handleModeAction} />
                   <ModeCard mode={LOBBY_MODES[2]} onAction={handleModeAction} />
+                  <StakeCard
+                    stakeInfo={creatorStakeInfo}
+                    onStake={() => setStakeModalOpen(true)}
+                    onUnstake={handleUnstake}
+                    isUnstaking={isUnstaking}
+                    isLoading={isGameManagerLoading}
+                    walletAddress={walletAddress || undefined}
+                  />
                 </section>
 
                 <aside className="col-span-5">
@@ -516,6 +719,14 @@ export default function DashboardClient() {
                 />
                 <ModeCard mode={LOBBY_MODES[1]} onAction={handleModeAction} />
                 <ModeCard mode={LOBBY_MODES[2]} onAction={handleModeAction} />
+                <StakeCard
+                  stakeInfo={creatorStakeInfo}
+                  onStake={() => setStakeModalOpen(true)}
+                  onUnstake={handleUnstake}
+                  isUnstaking={isUnstaking}
+                  isLoading={isGameManagerLoading}
+                  walletAddress={walletAddress || undefined}
+                />
               </div>
             </div>
 
@@ -569,6 +780,7 @@ export default function DashboardClient() {
           onSkip={handleSkip}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }
