@@ -18,11 +18,17 @@ function formatTime(seconds: number | null) {
   return `${m}:${s}`;
 }
 
-function RingTimer({ seconds }: { seconds: number | null }) {
+function RingTimer({
+  seconds,
+  maxSeconds = 60,
+}: {
+  seconds: number | null;
+  maxSeconds?: number;
+}) {
   const pct =
     seconds === null || seconds <= 0
       ? 0
-      : Math.max(0, Math.min(1, seconds / 60));
+      : Math.max(0, Math.min(1, seconds / maxSeconds));
   const dash = 2 * Math.PI * 44;
   const offset = dash * (1 - pct);
   return (
@@ -86,8 +92,12 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
     processed: boolean;
     winningChoice?: Choice;
     roundNumber?: number;
+    blockchainTimestamp?: number;
   } | null>(null);
   const [roundTimeRemaining, setRoundTimeRemaining] = React.useState<
+    number | null
+  >(null);
+  const [countdownTimeRemaining, setCountdownTimeRemaining] = React.useState<
     number | null
   >(null);
   const [isMakingChoice, setIsMakingChoice] = React.useState(false);
@@ -118,13 +128,23 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
           return;
         }
 
-        // Fetch player + round info only for in-progress
-        if (walletAddress && g.status === GameStatus.InProgress) {
-          const [pInfo, rInfo] = await Promise.all([
-            getPlayerInfo(matchId),
-            getRoundInfo(matchId, g.currentRound),
-          ]);
+        // Fetch player info for both Countdown and InProgress status
+        // During countdown, show overlay with countdown timer
+        // During InProgress, show round UI with choice buttons
+        if (
+          walletAddress &&
+          (g.status === GameStatus.Countdown ||
+            g.status === GameStatus.InProgress)
+        ) {
+          const pInfo = await getPlayerInfo(matchId);
           if (cancelled) return;
+
+          // Check elimination FIRST - if eliminated, redirect immediately
+          if (pInfo?.eliminated) {
+            router.replace(`/arena/${matchId}/defeat`);
+            return;
+          }
+
           setPlayerInfo(
             pInfo
               ? {
@@ -134,26 +154,44 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
                 }
               : null
           );
-          setRoundInfo(
-            rInfo ? { ...rInfo, roundNumber: rInfo.roundNumber } : null
-          );
 
-          // Eliminated -> defeat
-          if (pInfo?.eliminated) {
-            router.replace(`/arena/${matchId}/defeat`);
-            return;
+          // Only fetch round info if game is InProgress and round exists
+          if (g.status === GameStatus.InProgress && g.currentRound > 0) {
+            const rInfo = await getRoundInfo(matchId, g.currentRound);
+            if (cancelled) return;
+
+            if (rInfo && rInfo.deadline && rInfo.deadline > 0) {
+              setRoundInfo({ ...rInfo, roundNumber: rInfo.roundNumber });
+              const blockchainTime = rInfo.blockchainTimestamp
+                ? rInfo.blockchainTimestamp +
+                  (Math.floor(Date.now() / 1000) - rInfo.blockchainTimestamp)
+                : Math.floor(Date.now() / 1000);
+              const remaining = Math.max(0, rInfo.deadline - blockchainTime);
+              setRoundTimeRemaining(remaining);
+            } else {
+              // Round doesn't exist yet or deadline is invalid
+              setRoundInfo(null);
+              setRoundTimeRemaining(null);
+            }
+          } else {
+            // Game is in Countdown - no round yet
+            setRoundInfo(null);
+            setRoundTimeRemaining(null);
           }
 
-          if (rInfo?.deadline) {
+          // Calculate countdown timer if game is in Countdown status
+          if (g.status === GameStatus.Countdown && g.countdownDeadline) {
             const now = Math.floor(Date.now() / 1000);
-            setRoundTimeRemaining(Math.max(0, rInfo.deadline - now));
+            const remaining = Math.max(0, g.countdownDeadline - now);
+            setCountdownTimeRemaining(remaining);
           } else {
-            setRoundTimeRemaining(null);
+            setCountdownTimeRemaining(null);
           }
         } else {
           setPlayerInfo(null);
           setRoundInfo(null);
           setRoundTimeRemaining(null);
+          setCountdownTimeRemaining(null);
         }
       } catch (err) {
         console.error("Failed to load round:", err);
@@ -178,16 +216,51 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
     pollTick,
   ]);
 
-  
+  // Store the blockchain timestamp offset for accurate time calculation
+  const [blockchainTimeOffset, setBlockchainTimeOffset] = React.useState<
+    number | null
+  >(null);
+
+  // Update countdown timer every second when game is in Countdown
   React.useEffect(() => {
-    if (!roundInfo?.deadline) {
+    if (game?.status !== GameStatus.Countdown || !game.countdownDeadline) {
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const remaining = Math.max(0, game.countdownDeadline! - now);
+      setCountdownTimeRemaining(remaining);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [game?.status, game?.countdownDeadline]);
+
+  // Sync timer with contract deadline - uses blockchain time for accuracy
+  React.useEffect(() => {
+    if (!roundInfo?.deadline || !game) {
       setRoundTimeRemaining(null);
       return;
     }
 
+    // Calculate offset between blockchain time and local time when we fetched the data
+    if (roundInfo.blockchainTimestamp) {
+      const localTimeWhenFetched = Math.floor(Date.now() / 1000);
+      const offset = roundInfo.blockchainTimestamp - localTimeWhenFetched;
+      setBlockchainTimeOffset(offset);
+    }
+
     const updateTimer = () => {
-      const now = Math.floor(Date.now() / 1000);
-      const remaining = Math.max(0, roundInfo.deadline - now);
+      // Use blockchain time if we have the offset, otherwise use local time
+      // This ensures we're calculating based on blockchain time, not local machine time
+      const blockchainTime =
+        blockchainTimeOffset !== null
+          ? Math.floor(Date.now() / 1000) + blockchainTimeOffset
+          : Math.floor(Date.now() / 1000);
+
+      const remaining = Math.max(0, roundInfo.deadline - blockchainTime);
       setRoundTimeRemaining(remaining);
     };
 
@@ -197,24 +270,75 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
     // Then update every second
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [roundInfo?.deadline]);
+  }, [
+    roundInfo?.deadline,
+    roundInfo?.blockchainTimestamp,
+    game,
+    blockchainTimeOffset,
+  ]);
 
-  // Poll every 5s to refresh state
+  // Poll every 5s to refresh state and re-sync with contract
   React.useEffect(() => {
     const t = setInterval(() => setPollTick((x) => x + 1), 5000);
     return () => clearInterval(t);
   }, []);
 
+  // Re-sync round deadline from contract every poll tick to ensure exact sync with blockchain
+  React.useEffect(() => {
+    if (!game || game.status !== GameStatus.InProgress || !walletAddress)
+      return;
+
+    const syncWithContract = async () => {
+      try {
+        // Re-fetch round info from contract to get exact deadline and current blockchain time
+        const rInfo = await getRoundInfo(game.gameId, game.currentRound);
+        if (rInfo?.deadline) {
+          // Update roundInfo state with fresh contract data including blockchain timestamp
+          setRoundInfo({ ...rInfo, roundNumber: rInfo.roundNumber });
+
+          // Update blockchain time offset for accurate calculation
+          if (rInfo.blockchainTimestamp) {
+            const localTimeNow = Math.floor(Date.now() / 1000);
+            const offset = rInfo.blockchainTimestamp - localTimeNow;
+            setBlockchainTimeOffset(offset);
+          }
+
+          // Calculate remaining time using blockchain time
+          const blockchainTime =
+            rInfo.blockchainTimestamp || Math.floor(Date.now() / 1000);
+          const remaining = Math.max(0, rInfo.deadline - blockchainTime);
+          setRoundTimeRemaining(remaining);
+        }
+      } catch (err) {
+        console.error("Failed to sync timer with contract:", err);
+      }
+    };
+
+    syncWithContract();
+  }, [pollTick, game, walletAddress, getRoundInfo]);
+
   const handleMakeChoice = async (choice: Choice) => {
     if (!game || !walletAddress || isMakingChoice) return;
 
-   
-    if (roundInfo?.deadline) {
-      const now = Math.floor(Date.now() / 1000);
-      if (now >= roundInfo.deadline) {
-        setError("Round time has expired. Please wait for the next round.");
-        return;
-      }
+    // Check if round exists and has valid deadline
+    if (!roundInfo || !roundInfo.deadline || roundInfo.deadline === 0) {
+      setError("Round has not started yet. Please wait...");
+      return;
+    }
+
+    // Use blockchain time for deadline check (not local time)
+    // If we have blockchain timestamp offset, use it; otherwise use local time as fallback
+    const blockchainTime =
+      blockchainTimeOffset !== null
+        ? Math.floor(Date.now() / 1000) + blockchainTimeOffset
+        : roundInfo.blockchainTimestamp
+        ? roundInfo.blockchainTimestamp +
+          (Math.floor(Date.now() / 1000) - (roundInfo.blockchainTimestamp || 0))
+        : Math.floor(Date.now() / 1000);
+
+    if (blockchainTime >= roundInfo.deadline) {
+      setError("Round time has expired. Please wait for the next round.");
+      return;
     }
 
     // Check if player already made choice
@@ -243,8 +367,8 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
 
       if (ok) {
         console.log("[ArenaRoundClient] Choice made successfully!");
-        // Refresh game state immediately
-        await refreshGames();
+        // Refresh game state immediately (silent - no loading state)
+        await refreshGames(true);
         setPollTick((x) => x + 1);
         // Also fetch updated player info
         if (walletAddress) {
@@ -299,7 +423,12 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
     game &&
     game.status === GameStatus.InProgress &&
     playerInfo &&
-    !playerInfo.eliminated;
+    !playerInfo.eliminated &&
+    roundInfo &&
+    roundInfo.deadline &&
+    roundInfo.deadline > 0 &&
+    roundTimeRemaining !== null &&
+    roundTimeRemaining > 0;
 
   return (
     <div className="min-h-screen bg-background text-white">
@@ -348,9 +477,17 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
               <div className="py-12 text-center text-white/60">
                 Loading game...
               </div>
-            ) : game.status !== GameStatus.InProgress ? (
+            ) : game.status !== GameStatus.Countdown &&
+              game.status !== GameStatus.InProgress ? (
               <div className="py-12 text-center text-white/70">
                 Game is not live yet. Please return to the waiting room.
+              </div>
+            ) : !roundInfo || !roundInfo.deadline ? (
+              <div className="py-12 text-center text-white/70">
+                <div className="text-lg font-black mb-2">⏳ Round Starting</div>
+                <div className="text-sm text-white/60">
+                  Waiting for round to begin. Please wait...
+                </div>
               </div>
             ) : !playerInfo ? (
               <div className="py-12 text-center text-white/70">
@@ -362,6 +499,30 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
               </div>
             ) : (
               <>
+                {/* Countdown Overlay - Show when game is in Countdown status */}
+                {game.status === GameStatus.Countdown &&
+                  countdownTimeRemaining !== null && (
+                    <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center">
+                      <div className="text-center max-w-md px-6">
+                        <RingTimer
+                          seconds={countdownTimeRemaining}
+                          maxSeconds={60}
+                        />
+                        <div className="mt-6 text-2xl font-black text-white mb-2">
+                          ⏳ Waiting for Others to Join
+                        </div>
+                        <div className="text-white/70 text-sm mb-4">
+                          Game will start in{" "}
+                          {formatTime(countdownTimeRemaining)}
+                        </div>
+                        <div className="text-white/50 text-xs">
+                          Minimum players have joined. The game will begin
+                          automatically when the countdown ends.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-3xl border border-white/10 bg-surface/20 p-4">
                     <div className="text-[10px] uppercase tracking-[0.25em] text-white/50 font-black">
@@ -386,24 +547,48 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
                 </div>
 
                 <div className="mt-6 flex flex-col items-center">
-                  <RingTimer seconds={roundTimeRemaining} />
-                  <div className="mt-3 text-xs text-white/45">
-                    Make your choice to survive
-                  </div>
-                  {roundInfo?.deadline && (
-                    <div className="mt-2 text-white/60 text-xs">
-                      Round deadline:{" "}
-                      {new Date(roundInfo.deadline * 1000).toLocaleTimeString()}
-                    </div>
-                  )}
-                  {roundTimeRemaining !== null && (
-                    <div className="mt-1 text-white/50 text-xs">
-                      Time remaining: {formatTime(roundTimeRemaining)}
-                    </div>
-                  )}
+                  {game.status === GameStatus.InProgress &&
+                  roundTimeRemaining !== null ? (
+                    <>
+                      <RingTimer seconds={roundTimeRemaining} />
+                      <div className="mt-3 text-xs text-white/45">
+                        Make your choice to survive
+                      </div>
+                    </>
+                  ) : game.status === GameStatus.Countdown &&
+                    countdownTimeRemaining !== null ? (
+                    <>
+                      <RingTimer seconds={countdownTimeRemaining} />
+                      <div className="mt-3 text-xs text-white/45">
+                        Game starting soon...
+                      </div>
+                    </>
+                  ) : null}
+                  {game.status === GameStatus.InProgress &&
+                    roundInfo?.deadline && (
+                      <div className="mt-2 text-white/60 text-xs">
+                        Round deadline:{" "}
+                        {new Date(
+                          roundInfo.deadline * 1000
+                        ).toLocaleTimeString()}
+                      </div>
+                    )}
+                  {game.status === GameStatus.InProgress &&
+                    roundTimeRemaining !== null && (
+                      <div className="mt-1 text-white/50 text-xs">
+                        Time remaining: {formatTime(roundTimeRemaining)}
+                      </div>
+                    )}
+                  {game.status === GameStatus.Countdown &&
+                    countdownTimeRemaining !== null && (
+                      <div className="mt-1 text-white/50 text-xs">
+                        Countdown: {formatTime(countdownTimeRemaining)}
+                      </div>
+                    )}
                 </div>
 
-                {showChoiceUI && (
+                {/* Only show choice UI when game is InProgress and round is active */}
+                {showChoiceUI && game.status === GameStatus.InProgress && (
                   <div className="mt-6 grid grid-cols-2 gap-4">
                     {/* HEAD Card */}
                     <button
@@ -542,7 +727,8 @@ export default function ArenaRoundClient({ matchId }: { matchId: string }) {
 
                 {roundTimeRemaining !== null &&
                   roundTimeRemaining <= 0 &&
-                  !playerInfo.hasMadeChoice && (
+                  !playerInfo.hasMadeChoice &&
+                  !playerInfo.eliminated && (
                     <div className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-center">
                       <div className="text-red-200 font-black text-lg mb-1">
                         ⏱️ Round Time Expired
