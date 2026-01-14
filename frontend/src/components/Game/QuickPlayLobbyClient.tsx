@@ -45,11 +45,21 @@ export default function QuickPlayLobbyClient() {
     isLoading: isCreating,
     getCreatorStake,
     stakeAsCreator,
+    unstakeCreator,
+    isLoading: isGameManagerLoading,
   } = useGameManager();
 
   const [isJoining, setIsJoining] = React.useState<string | null>(null);
   const [selectedGame, setSelectedGame] = React.useState<GameData | null>(null);
   const [stakeModalOpen, setStakeModalOpen] = React.useState(false);
+  const [creatorStakeInfo, setCreatorStakeInfo] = React.useState<{
+    stakedAmount: string;
+    yieldAccumulated: string;
+    timestamp: number;
+    activeGamesCount: number;
+    hasStaked: boolean;
+  } | null>(null);
+  const [isUnstaking, setIsUnstaking] = React.useState(false);
 
   // Filter Quick Play games (mode = 0) that are waiting or in countdown
   const quickPlayGames = React.useMemo(() => {
@@ -76,14 +86,54 @@ export default function QuickPlayLobbyClient() {
     });
   }, [quickPlayGames]);
 
-  // Auto-refresh games
+  // Auto-refresh games (silent background refresh)
   React.useEffect(() => {
     const interval = setInterval(() => {
-      refreshGames();
+      refreshGames(true); // Silent refresh - no loading state
     }, 5000); // Refresh every 5 seconds
 
     return () => clearInterval(interval);
   }, [refreshGames]);
+
+  // Fetch creator stake info
+  React.useEffect(() => {
+    if (!walletAddress) {
+      setCreatorStakeInfo(null);
+      return;
+    }
+
+    const fetchStakeInfo = async () => {
+      try {
+        const stakeInfo = await getCreatorStake();
+        setCreatorStakeInfo(stakeInfo);
+      } catch (err) {
+        console.error("Failed to fetch creator stake:", err);
+      }
+    };
+
+    fetchStakeInfo();
+    // Refresh stake info every 10 seconds
+    const interval = setInterval(fetchStakeInfo, 10000);
+    return () => clearInterval(interval);
+  }, [walletAddress, getCreatorStake]);
+
+  const handleUnstake = React.useCallback(async () => {
+    if (!walletAddress) return;
+    
+    setIsUnstaking(true);
+    try {
+      const success = await unstakeCreator();
+      if (success) {
+        // Refresh stake info
+        const stakeInfo = await getCreatorStake();
+        setCreatorStakeInfo(stakeInfo);
+      }
+    } catch (err) {
+      console.error("Failed to unstake:", err);
+    } finally {
+      setIsUnstaking(false);
+    }
+  }, [walletAddress, unstakeCreator, getCreatorStake]);
 
   const handleJoinGame = React.useCallback(
     async (game: GameData) => {
@@ -149,6 +199,9 @@ export default function QuickPlayLobbyClient() {
       const success = await stakeAsCreator(amount);
       if (success) {
         setStakeModalOpen(false);
+        // Refresh stake info after staking
+        const stakeInfo = await getCreatorStake();
+        setCreatorStakeInfo(stakeInfo);
         // After successful stake, create the game
         const gameId = await createGame({
           currency: Currency.USDT0,
@@ -162,7 +215,7 @@ export default function QuickPlayLobbyClient() {
         }
       }
     },
-    [stakeAsCreator, createGame, router]
+    [stakeAsCreator, getCreatorStake, createGame, router]
   );
 
   // Find the most popular game (most players)
@@ -509,6 +562,123 @@ export default function QuickPlayLobbyClient() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Stake Card */}
+              <div className="rounded-2xl border border-white/10 bg-surface/30 backdrop-blur-xl p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="size-10 rounded-2xl bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center text-yellow-300">
+                    <Icon name="account_balance_wallet" className="text-[20px]" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-black">Creator Stake</div>
+                    <div className="text-xs text-white/60">
+                      {creatorStakeInfo?.hasStaked ? "Staked" : "Not Staked"}
+                    </div>
+                  </div>
+                </div>
+
+                {creatorStakeInfo?.hasStaked ? (
+                  <>
+                    {/* User has staked - show stake info */}
+                    <div className="space-y-4 mb-6">
+                      <div className="bg-background/50 rounded-xl p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-white/60">Staked Amount</span>
+                          <span className="text-lg font-black text-white">
+                            {parseFloat(creatorStakeInfo.stakedAmount).toFixed(2)} USDT0
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-white/60">Earnings</span>
+                          <span className="text-lg font-black text-primary">
+                            {parseFloat(creatorStakeInfo.yieldAccumulated).toFixed(4)} USDT0
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-white/60">Games Created</span>
+                          <span className="text-lg font-black text-white">
+                            {creatorStakeInfo.activeGamesCount}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleUnstake}
+                      disabled={isUnstaking || isGameManagerLoading || creatorStakeInfo.activeGamesCount > 0}
+                      className="w-full h-12 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 font-black hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isUnstaking ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Unstaking...
+                        </>
+                      ) : creatorStakeInfo.activeGamesCount > 0 ? (
+                        <>
+                          <Icon name="lock" />
+                          Cannot Unstake (Active Games)
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="account_balance_wallet" />
+                          Unstake
+                        </>
+                      )}
+                    </button>
+
+                    {creatorStakeInfo.activeGamesCount > 0 && (
+                      <div className="mt-3 text-xs text-yellow-300/70 text-center">
+                        You have {creatorStakeInfo.activeGamesCount} active game{creatorStakeInfo.activeGamesCount !== 1 ? "s" : ""}. Complete or cancel them before unstaking.
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* User hasn't staked - show benefits */}
+                    <div className="space-y-4 mb-6">
+                      <p className="text-sm text-white/70 leading-relaxed">
+                        Stake as a creator to unlock game creation and earn rewards:
+                      </p>
+                      <ul className="text-xs text-white/70 space-y-2">
+                        <li className="flex items-start gap-2">
+                          <span className="text-yellow-300 mt-0.5">•</span>
+                          <span>Create unlimited games</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-yellow-300 mt-0.5">•</span>
+                          <span>Earn 5% APY on your stake</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-yellow-300 mt-0.5">•</span>
+                          <span>10% creator fee from each game</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-yellow-300 mt-0.5">•</span>
+                          <span>Minimum stake: 30 USDT0</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <button
+                      onClick={() => setStakeModalOpen(true)}
+                      disabled={!walletAddress || isGameManagerLoading}
+                      className="w-full h-12 rounded-xl bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 font-black hover:bg-yellow-500/30 transition-colors shadow-[0_0_20px_rgba(255,193,7,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {!walletAddress ? (
+                        <>
+                          Connect Wallet
+                          <Icon name="account_balance_wallet" />
+                        </>
+                      ) : (
+                        <>
+                          Stake Now
+                          <Icon name="add" />
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Info Card */}
