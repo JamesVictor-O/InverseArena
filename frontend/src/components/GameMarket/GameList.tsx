@@ -6,6 +6,7 @@ import { Icon } from "@/components/Dashboard/Icon";
 import { useGames, GameData } from "@/hooks/useGames";
 import { GameStatus, Currency, CURRENCY_INFO } from "@/lib/contract-types";
 import { useConnectActions } from "@/components/Connect/ConnectActions";
+import { useGameManager } from "@/hooks/useGameManager";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 function getStatusTag(game: GameData): { label: string; color: string } {
@@ -57,11 +58,20 @@ function GameCard({
   onJoin: (gameId: string, entryFee: string) => void;
   isJoining: string | null;
 }) {
+  const { walletAddress } = useConnectActions();
+  const { getPlayerInfo, getWinningsWithdrawn } = useGameManager();
   const [currentTime, setCurrentTime] = React.useState(() =>
     Math.floor(Date.now() / 1000)
   );
+  const [playerEliminated, setPlayerEliminated] = React.useState<
+    boolean | null
+  >(null);
+  const [winningsWithdrawn, setWinningsWithdrawn] = React.useState<
+    boolean | null
+  >(null);
+  const [isCheckingStatus, setIsCheckingStatus] = React.useState(false);
 
-  // Update current time every second when game is in countdown
+
   React.useEffect(() => {
     if (game.status !== GameStatus.Countdown || !game.countdownDeadline) {
       return;
@@ -73,6 +83,49 @@ function GameCard({
 
     return () => clearInterval(interval);
   }, [game.status, game.countdownDeadline]);
+
+  // Check player status for in-progress or completed games
+  React.useEffect(() => {
+    if (!walletAddress || !game.isPlayer) {
+      setPlayerEliminated(null);
+      setWinningsWithdrawn(null);
+      return;
+    }
+
+    if (
+      game.status === GameStatus.InProgress ||
+      game.status === GameStatus.Completed
+    ) {
+      setIsCheckingStatus(true);
+      const checkStatus = async () => {
+        try {
+          if (game.status === GameStatus.InProgress) {
+            const playerInfo = await getPlayerInfo(game.gameId, walletAddress);
+            setPlayerEliminated(playerInfo?.eliminated ?? false);
+          }
+          if (game.status === GameStatus.Completed) {
+            const withdrawn = await getWinningsWithdrawn(game.gameId);
+            setWinningsWithdrawn(withdrawn);
+          }
+        } catch (err) {
+          console.error("Failed to check player status:", err);
+        } finally {
+          setIsCheckingStatus(false);
+        }
+      };
+      checkStatus();
+    } else {
+      setPlayerEliminated(null);
+      setWinningsWithdrawn(null);
+    }
+  }, [
+    walletAddress,
+    game.gameId,
+    game.status,
+    game.isPlayer,
+    getPlayerInfo,
+    getWinningsWithdrawn,
+  ]);
 
   const fillPct =
     game.maxPlayers > 0
@@ -87,8 +140,6 @@ function GameCard({
   const router = useRouter();
 
   const handleCardClick = () => {
-    // For InProgress games, navigate to arena to make choice
-    // For other games, navigate to waiting room
     if (game.status === GameStatus.InProgress) {
       router.push(`/arena/${game.gameId}`);
     } else {
@@ -108,7 +159,7 @@ function GameCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="text-base lg:text-lg font-black tracking-tight truncate">
-                {game.name || `Game #${game.gameId}`}
+                {game.name}
               </h3>
               {game.isPlayer && (
                 <span className="px-2 py-0.5 rounded-full bg-primary/15 border border-primary/30 text-primary text-[10px] font-black">
@@ -127,12 +178,12 @@ function GameCard({
                 {currencyInfo.symbol}
               </span>
               <span className="text-white/30">•</span>
-              <span className="font-mono">ID: {game.gameId}</span>
+        
               {game.currency !== Currency.MNT && (
                 <>
-                  <span className="text-white/30">•</span>
+                
                   <span className="text-primary font-bold">
-                    💰 {currencyInfo.apy}% APY
+                     {currencyInfo.apy}% APY
                   </span>
                 </>
               )}
@@ -170,31 +221,73 @@ function GameCard({
         )}
 
         {game.status === GameStatus.InProgress && (
-          <div className="mb-3 text-xs text-gray-400">
+          <div className="mb-3 text-xs text-gray-400 items-center flex">
             <Icon name="play_circle" className="inline mr-1" />
             Round {game.currentRound} in progress
           </div>
         )}
 
         {game.isPlayer ? (
-          <button
-            onClick={handleCardClick}
-            className="w-full h-10 lg:h-12 rounded-xl bg-primary/20 border border-primary/30 text-primary font-black text-sm tracking-wide hover:bg-primary/30 transition-colors flex items-center justify-center gap-2"
-          >
-            {game.status === GameStatus.InProgress ? (
-              <>
-                <Icon name="play_circle" />
-                Play
-                <Icon name="arrow_forward" className="text-sm" />
-              </>
+          <>
+            {game.status === GameStatus.Completed ? (
+              <button
+                onClick={handleCardClick}
+                className="w-full h-10 lg:h-12 rounded-xl bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 font-black text-sm tracking-wide hover:bg-yellow-500/30 transition-colors flex items-center justify-center gap-2"
+              >
+                {isCheckingStatus ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Checking...
+                  </>
+                ) : winningsWithdrawn ? (
+                  <>
+                    <Icon name="emoji_events" />
+                    View Winner
+                    <Icon name="arrow_forward" className="text-sm" />
+                  </>
+                ) : (
+                  <>
+                    <Icon name="account_balance_wallet" />
+                    Claim Win
+                    <Icon name="arrow_forward" className="text-sm" />
+                  </>
+                )}
+              </button>
+            ) : game.status === GameStatus.InProgress && playerEliminated ? (
+              <div className="w-full h-10 lg:h-12 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center gap-2 animate-bounce">
+                <span className="text-red-300 font-black text-sm tracking-wide">
+                  ❌ ELIMINATED
+                </span>
+              </div>
+            ) : game.status === GameStatus.InProgress ? (
+              <button
+                onClick={handleCardClick}
+                className="w-full h-10 lg:h-12 rounded-xl bg-primary/20 border border-primary/30 text-primary font-black text-sm tracking-wide hover:bg-primary/30 transition-colors flex items-center justify-center gap-2"
+              >
+                {isCheckingStatus ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="play_circle" />
+                    Play
+                    <Icon name="arrow_forward" className="text-sm" />
+                  </>
+                )}
+              </button>
             ) : (
-              <>
+              <button
+                onClick={handleCardClick}
+                className="w-full h-10 lg:h-12 rounded-xl bg-primary/20 border border-primary/30 text-primary font-black text-sm tracking-wide hover:bg-primary/30 transition-colors flex items-center justify-center gap-2"
+              >
                 <Icon name="check_circle" />
                 View Game
                 <Icon name="arrow_forward" className="text-sm" />
-              </>
+              </button>
             )}
-          </button>
+          </>
         ) : game.canJoin ? (
           <button
             onClick={() => onJoin(game.gameId, game.entryFee)}
@@ -232,7 +325,6 @@ export function GameList() {
   const { walletAddress } = useConnectActions();
   const {
     games,
-    featuredGames,
     activeGames,
     isLoading,
     error,
@@ -250,9 +342,7 @@ export function GameList() {
       try {
         const success = await joinGame(gameId, entryFee);
         if (success) {
-          // Refresh games after successful join
           await refreshGames();
-          // Navigate to game waiting room after successful join
           setTimeout(() => {
             router.push(`/dashboard/games/${gameId}`);
           }, 1000);
@@ -285,7 +375,7 @@ export function GameList() {
           <p className="text-red-400 font-bold mb-2">Error loading games</p>
           <p className="text-gray-400 text-sm mb-4">{error}</p>
           <button
-            onClick={refreshGames}
+            onClick={() => refreshGames(false)}
             className="px-6 py-2 rounded-xl bg-primary text-background font-black hover:bg-primary-hover transition-colors"
           >
             Try Again
@@ -320,18 +410,6 @@ export function GameList() {
               )}
             </p>
           </div>
-          <button
-            onClick={refreshGames}
-            disabled={isLoading}
-            className="flex items-center gap-2 px-4 lg:px-6 h-10 lg:h-12 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold"
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Icon name="refresh" />
-            )}
-            Refresh
-          </button>
         </div>
 
         {error && (
@@ -347,14 +425,9 @@ export function GameList() {
         {/* All Active Games - Single Section */}
         {activeGames.length > 0 && (
           <div className="mb-8 lg:mb-12">
-            <h2 className="text-xl lg:text-2xl font-black tracking-tight mb-4 lg:mb-6">
-              Active Games
-            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-              {/* Sort games: InProgress first, then Countdown, then Waiting, then by player count */}
               {activeGames
                 .sort((a, b) => {
-                  // InProgress games first
                   if (
                     a.status === GameStatus.InProgress &&
                     b.status !== GameStatus.InProgress
@@ -367,7 +440,6 @@ export function GameList() {
                   ) {
                     return 1;
                   }
-                  // Countdown games second
                   if (
                     a.status === GameStatus.Countdown &&
                     b.status !== GameStatus.Countdown
@@ -380,7 +452,6 @@ export function GameList() {
                   ) {
                     return 1;
                   }
-                  // Then sort by player count (descending)
                   return b.currentPlayerCount - a.currentPlayerCount;
                 })
                 .map((game) => (
@@ -404,7 +475,7 @@ export function GameList() {
             <h3 className="text-xl font-black mb-2">No games found</h3>
             <p className="text-gray-400 mb-6">Be the first to create a game!</p>
             <button
-              onClick={refreshGames}
+              onClick={() => refreshGames(false)}
               className="px-6 py-3 rounded-xl bg-primary text-background font-black hover:bg-primary-hover transition-colors"
             >
               Refresh
