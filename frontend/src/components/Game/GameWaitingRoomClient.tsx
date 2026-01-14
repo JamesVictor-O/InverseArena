@@ -66,8 +66,8 @@ function RoundTimeoutProcessor({
         Round time expired
       </div>
       <p className="text-sm text-orange-100">
-        Someone needs to process the round to continue. You can process it if you
-        want to help advance the game.
+        Someone needs to process the round to continue. You can process it if
+        you want to help advance the game.
       </p>
       <button
         onClick={handleProcess}
@@ -305,26 +305,26 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
 
           if (success) {
             setGameStarted(true);
-            // Wait a moment for blockchain to process, then refresh
+            // Wait a moment for blockchain to process, then refresh (silent)
             setTimeout(async () => {
-              await refreshGames();
+              await refreshGames(true);
               await fetchGameById(currentGame.gameId);
               setGameStarting(false);
             }, 3000); // Wait 3 seconds for blockchain to process
           } else {
-            // If it failed, just refresh to check status
+            // If it failed, just refresh to check status (silent)
             setGameStarting(false);
             setTimeout(async () => {
-              await refreshGames();
+              await refreshGames(true);
               await fetchGameById(currentGame.gameId);
             }, 2000);
           }
         } catch (err) {
           console.error("Failed to start game:", err);
           setGameStarting(false);
-          // Still refresh to check if someone else started it
+          // Still refresh to check if someone else started it (silent)
           setTimeout(async () => {
-            await refreshGames();
+            await refreshGames(true);
             await fetchGameById(currentGame.gameId);
           }, 2000);
         }
@@ -393,8 +393,8 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
           // Detect round change
           if (round.roundNumber && round.roundNumber !== previousRound) {
             setPreviousRound(round.roundNumber);
-            // Round changed - refresh everything
-            await refreshGames();
+            // Round changed - refresh everything (silent background refresh)
+            await refreshGames(true);
           }
         }
 
@@ -452,12 +452,12 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     getWinningsWithdrawn,
   ]);
 
-  // Auto-refresh game data
+  // Auto-refresh game data (silent background refresh)
   React.useEffect(() => {
     if (!currentGame) return;
 
     const interval = setInterval(() => {
-      refreshGames();
+      refreshGames(true); // Silent refresh - no loading state
       // Also refresh the specific game if we're viewing it
       if (currentGame?.gameId) {
         fetchGameById(currentGame.gameId);
@@ -474,7 +474,7 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
     try {
       const success = await joinGame(currentGame.gameId, currentGame.entryFee);
       if (success) {
-        await refreshGames();
+        await refreshGames(true); // Silent refresh - already showing isJoining state
       }
     } catch (err) {
       console.error("Failed to join game:", err);
@@ -500,7 +500,7 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
               eliminated: player.eliminated,
             });
           }
-          await refreshGames();
+          await refreshGames(true); // Silent refresh - already showing isMakingChoice state
         }
       } catch (err) {
         console.error("Failed to make choice:", err);
@@ -523,7 +523,7 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
         );
         if (success) {
           setWinningsWithdrawn(true);
-          await refreshGames();
+          await refreshGames(true); // Silent refresh - already showing isWithdrawing state
         }
       } catch (err) {
         console.error("Failed to withdraw winnings:", err);
@@ -998,7 +998,7 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
                           roundNumber={currentGame.currentRound}
                           processRoundTimeout={processRoundTimeout}
                           onProcessed={async () => {
-                            await refreshGames();
+                            await refreshGames(true); // Silent refresh after processing
                             await fetchGameById(currentGame.gameId);
                           }}
                         />
