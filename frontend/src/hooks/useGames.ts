@@ -56,7 +56,7 @@ interface UseGamesReturn {
   activeGames: GameData[];
   isLoading: boolean;
   error: string | null;
-  refreshGames: () => Promise<void>;
+  refreshGames: (silent?: boolean) => Promise<void>;
   fetchGameById: (gameId: string) => Promise<GameData | null>;
   joinGame: (gameId: string, entryFee: string) => Promise<boolean>;
 }
@@ -108,7 +108,7 @@ export function useGames(walletAddress?: string): UseGamesReturn {
           ? "Mantle Mainnet"
           : `Chain ID ${network.chainId}`;
 
-      // Try to switch network automatically
+
       const switched = await requestMantleSepoliaNetwork();
       if (!switched) {
         throw new Error(
@@ -121,273 +121,287 @@ export function useGames(walletAddress?: string): UseGamesReturn {
   }, []);
 
   // Fetch all games from the contract
-  const fetchGames = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_RPC_URL || "https://rpc.sepolia.mantle.xyz"
-      );
-      const gameManagerConfig = getContractConfig("GameManager");
-      const gameManager = new ethers.Contract(
-        gameManagerConfig.address,
-        gameManagerConfig.abi,
-        provider
-      );
-
-      // Get total games count from stats
-      const stats = await gameManager.stats();
-      const totalGames = Number(stats.totalGames);
-
-      if (totalGames === 0) {
-        setGames([]);
-        setIsLoading(false);
-        return;
+  const fetchGames = useCallback(
+    async (silent = false) => {
+      if (!silent) {
+        setIsLoading(true);
       }
+      setError(null);
 
-      console.log(`Fetching ${totalGames} games...`);
+      try {
+        const provider = new ethers.JsonRpcProvider(
+          process.env.NEXT_PUBLIC_RPC_URL || "https://rpc.sepolia.mantle.xyz"
+        );
+        const gameManagerConfig = getContractConfig("GameManager");
+        const gameManager = new ethers.Contract(
+          gameManagerConfig.address,
+          gameManagerConfig.abi,
+          provider
+        );
 
-      // Fetch games in batches
-      // Start from the most recent games (highest IDs) and work backwards
-      const gamePromises: Promise<GameData | null>[] = [];
-      const batchCount = 5; // Fetch last N batches
-      const startGameId = Math.max(0, totalGames - BATCH_SIZE * batchCount); // Fetch last N batches
-      const endGameId = Math.max(1, totalGames); // At least check game ID 0
+        // Get total games count from stats
+        const stats = await gameManager.stats();
+        const totalGames = Number(stats.totalGames);
 
-      for (let gameId = startGameId; gameId < endGameId; gameId++) {
-        gamePromises.push(
-          (async (): Promise<GameData | null> => {
-            try {
-              // Check if game exists by calling getGame
-              // Note: getGame throws if game doesn't exist due to validGame modifier
-              const gameData = await gameManager.getGame(gameId);
+        if (totalGames === 0) {
+          setGames([]);
+          setIsLoading(false);
+          return;
+        }
 
-              // Handle tuple return from contract (getGame returns multiple values)
-              // Contract returns: (uint256 gameId_, GameMode mode, GameStatus status, Currency currency, ...)
-              const returnedGameId =
-                gameData.gameId_?.toString() ||
-                gameData[0]?.toString() ||
-                gameId.toString();
+        console.log(`Fetching ${totalGames} games...`);
 
-              // Verify gameId matches (should always match if game exists)
-              if (returnedGameId !== gameId.toString()) {
-                console.warn(
-                  `Game ID mismatch: expected ${gameId}, got ${returnedGameId}`
+        // Fetch games in batches
+        // Start from the most recent games (highest IDs) and work backwards
+        const gamePromises: Promise<GameData | null>[] = [];
+        const batchCount = 5; // Fetch last N batches
+        const startGameId = Math.max(0, totalGames - BATCH_SIZE * batchCount); // Fetch last N batches
+        const endGameId = Math.max(1, totalGames); // At least check game ID 0
+
+        for (let gameId = startGameId; gameId < endGameId; gameId++) {
+          gamePromises.push(
+            (async (): Promise<GameData | null> => {
+              try {
+                // Check if game exists by calling getGame
+                // Note: getGame throws if game doesn't exist due to validGame modifier
+                const gameData = await gameManager.getGame(gameId);
+
+                // Handle tuple return from contract (getGame returns multiple values)
+                // Contract returns: (uint256 gameId_, GameMode mode, GameStatus status, Currency currency, ...)
+                const returnedGameId =
+                  gameData.gameId_?.toString() ||
+                  gameData[0]?.toString() ||
+                  gameId.toString();
+
+                // Verify gameId matches (should always match if game exists)
+                if (returnedGameId !== gameId.toString()) {
+                  console.warn(
+                    `Game ID mismatch: expected ${gameId}, got ${returnedGameId}`
+                  );
+                  return null;
+                }
+
+                // Get players list
+                let playerList: string[] = [];
+                try {
+                  const players = await gameManager.getGamePlayers(gameId);
+                  // Handle both array and tuple return formats
+                  if (Array.isArray(players)) {
+                    playerList = players.filter(
+                      (addr) => addr && addr !== ethers.ZeroAddress
+                    );
+                  } else if (players && typeof players === "object") {
+                    // Might be a tuple-like object
+                    playerList = Object.values(players).filter(
+                      (addr) =>
+                        addr &&
+                        typeof addr === "string" &&
+                        addr !== ethers.ZeroAddress
+                    ) as string[];
+                  }
+                  console.log(
+                    `Fetched ${playerList.length} players for game ${gameId}:`,
+                    playerList
+                  );
+                } catch (err) {
+                  console.warn(
+                    `Failed to fetch players for game ${gameId}:`,
+                    err
+                  );
+                  // Game might not have players yet
+                }
+
+                // Check if current user is a player
+                let isPlayer = false;
+                if (walletAddress) {
+                  try {
+                    const playerInfo = await gameManager.getPlayerInfo(
+                      gameId,
+                      walletAddress
+                    );
+                    isPlayer = playerInfo.isPlaying || false;
+                  } catch {
+                    isPlayer = false;
+                  }
+                }
+
+                // Handle both tuple and object return formats
+                const currency = Number(
+                  gameData.currency !== undefined
+                    ? gameData.currency
+                    : gameData[3]
+                ) as Currency;
+                const currencyInfo = CURRENCY_INFO[currency];
+                const status = Number(
+                  gameData.status !== undefined ? gameData.status : gameData[2]
+                ) as GameStatus;
+                const mode = Number(
+                  gameData.mode !== undefined ? gameData.mode : gameData[1]
+                ) as GameMode;
+
+                const entryFee =
+                  gameData.entryFee !== undefined
+                    ? gameData.entryFee
+                    : gameData[4];
+                const maxPlayers =
+                  gameData.maxPlayers !== undefined
+                    ? gameData.maxPlayers
+                    : gameData[5];
+                const currentRound =
+                  gameData.currentRound !== undefined
+                    ? gameData.currentRound
+                    : gameData[6];
+                const winner =
+                  gameData.winner !== undefined ? gameData.winner : gameData[7];
+                const totalPrizePool =
+                  gameData.totalPrizePool !== undefined
+                    ? gameData.totalPrizePool
+                    : gameData[8];
+                const yieldAccumulated =
+                  gameData.yieldAccumulated !== undefined
+                    ? gameData.yieldAccumulated
+                    : gameData[9];
+                const playerCount =
+                  gameData.playerCount !== undefined
+                    ? gameData.playerCount
+                    : gameData[10];
+                const gameName =
+                  gameData.gameName !== undefined
+                    ? gameData.gameName
+                    : gameData[11] || "";
+                const creator = gameData.creator || "";
+                const currencyAddress = gameData.currencyAddress || "";
+
+                // Calculate entry fee in human-readable format
+                const entryFeeDecimals = currency === Currency.USDT0 ? 6 : 18;
+                const entryFeeFormatted = ethers.formatUnits(
+                  entryFee,
+                  entryFeeDecimals
                 );
+
+                // Determine if user can join
+                const canJoin =
+                  status === GameStatus.Waiting ||
+                  status === GameStatus.Countdown;
+                // Note: isCreator will be recalculated after fetching actualCreator from games mapping
+
+                // Check countdown deadline if in countdown status
+                let countdownDeadline: number | undefined;
+                if (status === GameStatus.Countdown) {
+                  try {
+                    const countdownRemaining =
+                      await gameManager.getCountdownTimeRemaining(gameId);
+                    const currentTime = Math.floor(Date.now() / 1000);
+                    countdownDeadline =
+                      currentTime + Number(countdownRemaining);
+                  } catch {
+                    // Could not fetch countdown
+                  }
+                }
+
+                // Get additional data from games mapping (creator, startTime)
+                let actualCreator = creator;
+                let startTime = 0;
+                try {
+                  const gameStruct = await gameManager.games(gameId);
+                  actualCreator = gameStruct.creator || creator || "";
+                  // Handle different return formats
+                  if (!actualCreator || actualCreator === "") {
+                    // Try accessing as array index or property
+                    actualCreator =
+                      gameStruct[0] || gameStruct.creator || creator || "";
+                  }
+                  startTime = Number(gameStruct.startTime || 0);
+                  console.log(
+                    `[fetchGames] Creator for game ${gameId}:`,
+                    actualCreator
+                  );
+                } catch (err) {
+                  console.warn(
+                    `[fetchGames] Failed to fetch games mapping for game ${gameId}:`,
+                    err
+                  );
+                  // Could not fetch from games mapping, use creator from gameData if available
+                  if (!actualCreator) {
+                    // Try to extract creator from gameData if available
+                    actualCreator = creator || "";
+                  }
+                }
+
+                return {
+                  gameId: returnedGameId,
+                  mode,
+                  status,
+                  currency,
+                  currencyAddress,
+                  entryFee: entryFeeFormatted,
+                  maxPlayers: Number(maxPlayers),
+                  minPlayers: 4, // Default min players
+                  startTime,
+                  countdownDeadline,
+                  currentRound: Number(currentRound || 0),
+                  creator: actualCreator,
+                  winner:
+                    winner && winner !== ethers.ZeroAddress
+                      ? winner
+                      : undefined,
+                  totalPrizePool: ethers.formatUnits(
+                    totalPrizePool || 0,
+                    entryFeeDecimals
+                  ),
+                  yieldAccumulated: ethers.formatUnits(
+                    yieldAccumulated || 0,
+                    entryFeeDecimals
+                  ),
+                  yieldProtocol: 0, // Not returned by getGame, would need to fetch from games mapping
+                  yieldDistributed: false, // Not returned by getGame, would need to fetch from games mapping
+                  name: gameName || `Game #${gameId}`,
+                  playerCount: Number(playerCount || playerList.length),
+                  currentPlayerCount: playerList.length,
+                  canJoin,
+                  isPlayer,
+                  isCreator:
+                    actualCreator && walletAddress
+                      ? actualCreator.toLowerCase() ===
+                        walletAddress.toLowerCase()
+                      : false,
+                  playerList: playerList || [], // Add playerList to the returned object
+                };
+              } catch (err) {
+                // Game doesn't exist or error fetching - skip it
+                console.warn(`Failed to fetch game ${gameId}:`, err);
                 return null;
               }
+            })()
+          );
+        }
 
-              // Get players list
-              let playerList: string[] = [];
-              try {
-                const players = await gameManager.getGamePlayers(gameId);
-                // Handle both array and tuple return formats
-                if (Array.isArray(players)) {
-                  playerList = players.filter(
-                    (addr) => addr && addr !== ethers.ZeroAddress
-                  );
-                } else if (players && typeof players === "object") {
-                  // Might be a tuple-like object
-                  playerList = Object.values(players).filter(
-                    (addr) =>
-                      addr &&
-                      typeof addr === "string" &&
-                      addr !== ethers.ZeroAddress
-                  ) as string[];
-                }
-                console.log(
-                  `Fetched ${playerList.length} players for game ${gameId}:`,
-                  playerList
-                );
-              } catch (err) {
-                console.warn(
-                  `Failed to fetch players for game ${gameId}:`,
-                  err
-                );
-                // Game might not have players yet
-              }
-
-              // Check if current user is a player
-              let isPlayer = false;
-              if (walletAddress) {
-                try {
-                  const playerInfo = await gameManager.getPlayerInfo(
-                    gameId,
-                    walletAddress
-                  );
-                  isPlayer = playerInfo.isPlaying || false;
-                } catch {
-                  isPlayer = false;
-                }
-              }
-
-              // Handle both tuple and object return formats
-              const currency = Number(
-                gameData.currency !== undefined
-                  ? gameData.currency
-                  : gameData[3]
-              ) as Currency;
-              const currencyInfo = CURRENCY_INFO[currency];
-              const status = Number(
-                gameData.status !== undefined ? gameData.status : gameData[2]
-              ) as GameStatus;
-              const mode = Number(
-                gameData.mode !== undefined ? gameData.mode : gameData[1]
-              ) as GameMode;
-
-              const entryFee =
-                gameData.entryFee !== undefined
-                  ? gameData.entryFee
-                  : gameData[4];
-              const maxPlayers =
-                gameData.maxPlayers !== undefined
-                  ? gameData.maxPlayers
-                  : gameData[5];
-              const currentRound =
-                gameData.currentRound !== undefined
-                  ? gameData.currentRound
-                  : gameData[6];
-              const winner =
-                gameData.winner !== undefined ? gameData.winner : gameData[7];
-              const totalPrizePool =
-                gameData.totalPrizePool !== undefined
-                  ? gameData.totalPrizePool
-                  : gameData[8];
-              const yieldAccumulated =
-                gameData.yieldAccumulated !== undefined
-                  ? gameData.yieldAccumulated
-                  : gameData[9];
-              const playerCount =
-                gameData.playerCount !== undefined
-                  ? gameData.playerCount
-                  : gameData[10];
-              const gameName =
-                gameData.gameName !== undefined
-                  ? gameData.gameName
-                  : gameData[11] || "";
-              const creator = gameData.creator || "";
-              const currencyAddress = gameData.currencyAddress || "";
-
-              // Calculate entry fee in human-readable format
-              const entryFeeDecimals = currency === Currency.USDT0 ? 6 : 18;
-              const entryFeeFormatted = ethers.formatUnits(
-                entryFee,
-                entryFeeDecimals
-              );
-
-              // Determine if user can join
-              const canJoin =
-                status === GameStatus.Waiting ||
-                status === GameStatus.Countdown;
-              // Note: isCreator will be recalculated after fetching actualCreator from games mapping
-
-              // Check countdown deadline if in countdown status
-              let countdownDeadline: number | undefined;
-              if (status === GameStatus.Countdown) {
-                try {
-                  const countdownRemaining =
-                    await gameManager.getCountdownTimeRemaining(gameId);
-                  const currentTime = Math.floor(Date.now() / 1000);
-                  countdownDeadline = currentTime + Number(countdownRemaining);
-                } catch {
-                  // Could not fetch countdown
-                }
-              }
-
-              // Get additional data from games mapping (creator, startTime)
-              let actualCreator = creator;
-              let startTime = 0;
-              try {
-                const gameStruct = await gameManager.games(gameId);
-                actualCreator = gameStruct.creator || creator || "";
-                // Handle different return formats
-                if (!actualCreator || actualCreator === "") {
-                  // Try accessing as array index or property
-                  actualCreator =
-                    gameStruct[0] || gameStruct.creator || creator || "";
-                }
-                startTime = Number(gameStruct.startTime || 0);
-                console.log(
-                  `[fetchGames] Creator for game ${gameId}:`,
-                  actualCreator
-                );
-              } catch (err) {
-                console.warn(
-                  `[fetchGames] Failed to fetch games mapping for game ${gameId}:`,
-                  err
-                );
-                // Could not fetch from games mapping, use creator from gameData if available
-                if (!actualCreator) {
-                  // Try to extract creator from gameData if available
-                  actualCreator = creator || "";
-                }
-              }
-
-              return {
-                gameId: returnedGameId,
-                mode,
-                status,
-                currency,
-                currencyAddress,
-                entryFee: entryFeeFormatted,
-                maxPlayers: Number(maxPlayers),
-                minPlayers: 4, // Default min players
-                startTime,
-                countdownDeadline,
-                currentRound: Number(currentRound || 0),
-                creator: actualCreator,
-                winner:
-                  winner && winner !== ethers.ZeroAddress ? winner : undefined,
-                totalPrizePool: ethers.formatUnits(
-                  totalPrizePool || 0,
-                  entryFeeDecimals
-                ),
-                yieldAccumulated: ethers.formatUnits(
-                  yieldAccumulated || 0,
-                  entryFeeDecimals
-                ),
-                yieldProtocol: 0, // Not returned by getGame, would need to fetch from games mapping
-                yieldDistributed: false, // Not returned by getGame, would need to fetch from games mapping
-                name: gameName || `Game #${gameId}`,
-                playerCount: Number(playerCount || playerList.length),
-                currentPlayerCount: playerList.length,
-                canJoin,
-                isPlayer,
-                isCreator:
-                  actualCreator && walletAddress
-                    ? actualCreator.toLowerCase() ===
-                      walletAddress.toLowerCase()
-                    : false,
-                playerList: playerList || [], // Add playerList to the returned object
-              };
-            } catch (err) {
-              // Game doesn't exist or error fetching - skip it
-              console.warn(`Failed to fetch game ${gameId}:`, err);
-              return null;
-            }
-          })()
+        // Wait for all promises and filter out nulls
+        const results = await Promise.all(gamePromises);
+        const validGames = results.filter(
+          (game): game is GameData => game !== null
         );
+
+        // Sort by gameId descending (newest first)
+        validGames.sort((a, b) => Number(b.gameId) - Number(a.gameId));
+
+        console.log(`Loaded ${validGames.length} games`);
+        setGames(validGames);
+      } catch (err) {
+        console.error("Error fetching games:", err);
+        if (!silent) {
+          setError(
+            err instanceof Error ? err.message : "Failed to fetch games"
+          );
+        }
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
       }
-
-      // Wait for all promises and filter out nulls
-      const results = await Promise.all(gamePromises);
-      const validGames = results.filter(
-        (game): game is GameData => game !== null
-      );
-
-      // Sort by gameId descending (newest first)
-      validGames.sort((a, b) => Number(b.gameId) - Number(a.gameId));
-
-      console.log(`Loaded ${validGames.length} games`);
-      setGames(validGames);
-    } catch (err) {
-      console.error("Error fetching games:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch games");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [walletAddress]);
+    },
+    [walletAddress]
+  );
 
   // Fetch a single game by ID
   const fetchGameById = useCallback(
@@ -697,24 +711,24 @@ export function useGames(walletAddress?: string): UseGamesReturn {
     [games, getSigner, fetchGames]
   );
 
-  // Refresh games
-  const refreshGames = useCallback(async () => {
-    await fetchGames();
-  }, [fetchGames]);
+  // Refresh games (with optional silent mode for background updates)
+  const refreshGames = useCallback(
+    async (silent = false) => {
+      await fetchGames(silent);
+    },
+    [fetchGames]
+  );
 
-  // Fetch games on mount and when wallet address changes
   useEffect(() => {
-    fetchGames();
+    fetchGames(false);
 
-    // Set up polling to refresh games every 10 seconds
     const interval = setInterval(() => {
-      fetchGames();
+      fetchGames(true);
     }, 10000);
 
     return () => clearInterval(interval);
   }, [fetchGames]);
 
-  // Filter games by status
   const featuredGames = games.filter(
     (game) =>
       game.status === GameStatus.InProgress ||
@@ -723,7 +737,16 @@ export function useGames(walletAddress?: string): UseGamesReturn {
   );
 
   const activeGames = games.filter((game) => {
-    // Always include games the user has joined (regardless of status)
+    // Exclude completed games unless user is a player (they may need to claim)
+    if (game.status === GameStatus.Completed) {
+      // Only show completed games if user is a player (they might need to claim winnings)
+      return walletAddress && game.isPlayer;
+    }
+    // Exclude cancelled games
+    if (game.status === GameStatus.Cancelled) {
+      return false;
+    }
+    // Always include games the user has joined (for other statuses)
     if (walletAddress && game.isPlayer) {
       return true;
     }
