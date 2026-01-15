@@ -597,7 +597,7 @@ export default function GameWaitingRoomClient({ gameId }: { gameId: string }) {
           </p>
           <div className="flex items-center gap-3 justify-center">
             <button
-              onClick={refreshGames}
+              onClick={() => refreshGames(false)}
               className="px-6 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-black hover:bg-white/20 transition-colors"
             >
               Refresh
