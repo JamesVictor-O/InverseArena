@@ -1208,10 +1208,12 @@ export function useGameManager(): UseGameManagerReturn {
         if (error.data) {
           try {
             const gameManagerConfig = getContractConfig("GameManager");
+            const signer = await getSigner();
+            const provider = signer.provider;
             const tempContract = new ethers.Contract(
               gameManagerConfig.address,
               gameManagerConfig.abi,
-              signer.provider || undefined
+              provider || undefined
             );
             const decoded = tempContract.interface.parseError(error.data);
             if (decoded) {
