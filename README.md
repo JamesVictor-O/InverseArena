@@ -1,15 +1,30 @@
 # 🎮 INVERSE ARENA
 
-## The First RWA-Powered Elimination Game on Mantle Network
+## The RWA-Powered multiplayer blockchain elimination game where minority wins. Built on Mantle network
 
 [![Mantle Network](https://img.shields.io/badge/Built%20on-Mantle-blue)](https://mantle.xyz)
+[![Live Link]](https://inverse-arena-frontend-a9zu.vercel.app/)
+[![Pitch deck]](https://www.canva.com/design/DAG-ZjrkX2M/KDpjTgTLUYak71EzxhxM6w/edit?utm_content=DAG-ZjrkX2M&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
 
-
-**Inverse Arena**  RWA-Powered Elimination Game on Mantle and Base Where contrarian thinking meets **institutional-grade yield**. Player stakes automatically flow into USDT0, mETH, and Aave, generating real returns while you compete. The last player standing claims the prize pool + accumulated DeFi yields. Built exclusively on Mantle's modular infrastructure
+**Inverse Arena** is a fun pvp blockchain elimination prediction style  game where players compete in pools by making binary choices (Heads or Tails). The twist: players who choose the minority option advance to the next round, while the majority gets eliminated. The last player standing wins the entire prize pool. BOTH player stakes AND creator stakes generate REAL institutional yield from Mantle's RWA protocols (USDT0, mETH) during gameplay. Players stake entry fees that auto-deposit into yield protocols (4-6% APY), while creators stake 30+ USDT0 to become game hosts (earning 5% APY on stake PLUS 10% fees from every successfully resolved game).
 
 
 
 ---
+
+## Game Mechanics
+### Core Gameplay
+- Binary Choices: Players choose between Heads or Tails each round
+- Minority Wins: Players who pick the less popular choice advance
+- Elimination: Majority players are eliminated each round
+- Winner Takes All: Last remaining player wins the entire prize pool
+
+### Pool Lifecycle
+- Creation: Verified creators stake USDT0 or mETH to create pools with entry fees and their stake are automaticaly put into Mantle's RWA protocols to generate REAL institutional yield
+- Joining: Players join by paying the entry fee set by the Pool/Game creatore
+- Activation: Pool starts when minimum players join or creator activates
+- Rounds: Players make choices, minorities advance, majorities eliminated
+- Completion: Game ends when one player remains or all choose the same option
 
 ## 💎 Real-World Asset Integration
 
