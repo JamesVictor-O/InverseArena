@@ -344,7 +344,7 @@ export default function QuickPlayLobbyClient() {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-black">Available Games</h2>
                   <button
-                    onClick={refreshGames}
+                    onClick={() => refreshGames(false)}
                     disabled={isLoading}
                     className="flex items-center gap-2 px-4 h-10 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold"
                   >
