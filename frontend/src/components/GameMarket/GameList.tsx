@@ -84,7 +84,6 @@ function GameCard({
     return () => clearInterval(interval);
   }, [game.status, game.countdownDeadline]);
 
-  // Check player status for in-progress or completed games
   React.useEffect(() => {
     if (!walletAddress || !game.isPlayer) {
       setPlayerEliminated(null);
@@ -421,8 +420,6 @@ export function GameList() {
             </div>
           </div>
         )}
-
-        {/* All Active Games - Single Section */}
         {activeGames.length > 0 && (
           <div className="mb-8 lg:mb-12">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
