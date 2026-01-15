@@ -6,20 +6,21 @@
 [![Live Link]](https://inverse-arena-frontend-a9zu.vercel.app/)
 [![Pitch deck]](https://www.canva.com/design/DAG-ZjrkX2M/KDpjTgTLUYak71EzxhxM6w/edit?utm_content=DAG-ZjrkX2M&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
 
-**Inverse Arena** is a fun pvp blockchain elimination prediction style  game where players compete in pools by making binary choices (Heads or Tails). The twist: players who choose the minority option advance to the next round, while the majority gets eliminated. The last player standing wins the entire prize pool. BOTH player stakes AND creator stakes generate REAL institutional yield from Mantle's RWA protocols (USDT0, mETH) during gameplay. Players stake entry fees that auto-deposit into yield protocols (4-6% APY), while creators stake 30+ USDT0 to become game hosts (earning 5% APY on stake PLUS 10% fees from every successfully resolved game).
-
-
+**Inverse Arena** is a fun pvp blockchain elimination prediction style game where players compete in pools by making binary choices (Heads or Tails). The twist: players who choose the minority option advance to the next round, while the majority gets eliminated. The last player standing wins the entire prize pool. BOTH player stakes AND creator stakes generate REAL institutional yield from Mantle's RWA protocols (USDT0, mETH) during gameplay. Players stake entry fees that auto-deposit into yield protocols (4-6% APY), while creators stake 30+ USDT0 to become game hosts (earning 5% APY on stake PLUS 10% fees from every successfully resolved game).
 
 ---
 
 ## Game Mechanics
+
 ### Core Gameplay
+
 - Binary Choices: Players choose between Heads or Tails each round
 - Minority Wins: Players who pick the less popular choice advance
 - Elimination: Majority players are eliminated each round
 - Winner Takes All: Last remaining player wins the entire prize pool
 
 ### Pool Lifecycle
+
 - Creation: Verified creators stake USDT0 or mETH to create pools with entry fees and their stake are automaticaly put into Mantle's RWA protocols to generate REAL institutional yield
 - Joining: Players join by paying the entry fee set by the Pool/Game creatore
 - Activation: Pool starts when minimum players join or creator activates
@@ -41,61 +42,33 @@ Traditional GameFi projects have a fatal flaw: **player stakes sit idle**. In In
 ---
 
 ## 🎯 The Problem We Solve
+### 1. The GameFi Sustainability Crisis 
 
-### 1. GameFi's Sustainability Crisis
+Most Web3 games rely on inflationary token emissions to reward players. When new player growth slows, the token value crashes, the economy collapses, and the project fails. Investors are tired of "Ponzinomics" that lack a real revenue floor.
 
-- **Traditional Model**: Inflationary token emissions → Unsustainable economics → Project collapse
-- **Inverse Arena**: Real yield from RWAs → Sustainable economics → Long-term viability
+### 2. The Idle Capital Inefficiency
 
-### 2. Predictable Gameplay
+Currently, billions in GameFi TVL (Total Value Locked) sits stagnant in smart contracts. While players and stakers wait for matches or progress through levels, their capital earns $0$ interest. This is a massive opportunity cost for users and a waste of liquidity for the ecosystem.
 
-- **Traditional Model**: "Majority wins" → Boring, predictable outcomes
-- **Inverse Arena**: "Minority survives" → Strategic depth, psychological warfare
+### 3. The "Majority-Rule" Boredom
 
-### 3. The Waiting Room Problem
+Traditional prediction games often reward the majority, leading to "herd behavior" and low-stakes excitement. There is a lack of high-tension, contrarian gameplay that rewards strategic intuition and psychological play, leading to stagnant retention rates.
 
-- **Traditional Model**: "Game needs 10 players. Only 2 joined. Player leaves frustrated."
-- **Inverse Arena**: Smart matchmaking, multiple game modes, <30s average wait time
+### 4. Fragmented UX & Value Friction
 
-### 4. Zero Real Value Accrual
-
-- **Traditional Model**: Stakes sit idle in contract
-- **Inverse Arena**: Stakes generate 4-6% APY via mETH, USDT0, Aave
+Players face a "dead-air" problem: long matchmaking wait times with no value accrual. If a player waits 10 minutes for a game to start, they have lost both time and potential yield. Current platforms fail to bridge the gap between DeFi earning and Active gaming.
 
 ---
 
-## 💡 The RWA-Powered Solution
+## 💡  Solution
+1. RWA-Powered Prize Pools: Player stakes ($USDTO$) are never idle. They are immediately routed into institutional-grade, yield-bearing Real-World Assets. The prize pool grows every second the game is active.
 
-### Core Innovation: Contrarian Gameplay + Institutional Yield
 
-```
-Player Flow:
-1. Stake 100 USDT0 → Automatically deposited to Mantle's RWA protocols
-2. Make binary choice (HEAD or TAIL) each round
-3. Minority survives, majority eliminated
-4. Prize pool grows from yield generation during gameplay
-5. Winner receives: 950 USDT0 (after fee) + ~2.5 USDT0 yield = 952.5 USDT0
+2. The "Contrarian" Game Engine: A high-tension PvP survival game where you only survive if you choose the minority side. It’s a psychological battle that rewards strategy over herd behavior.
 
-For a 15-minute game, that's 2.5% annualized return PLUS the prize money!
-```
+3. Mantle Modular Speed: Leveraging Mantle’s low fees and high throughput to ensure instant matchmaking and seamless, low-cost "Head or Tails" rounds.
 
-### Real Yield, Not Token Emissions
-
-**Example Yield Breakdown:**
-
-| Game Setup                      | Yield Generated      |
-| ------------------------------- | -------------------- |
-| 10 players × 100 USDT0 = 1,000 | 15 min game @ 5% APY |
-| Total Pool: 1,000 USDT0         | Yield: ~2.1 USDT0    |
-| Winner's Prize: 950 USDT0       | Total: 952.1 USDT0   |
-
-**Longer tournaments generate MORE yield:**
-
-- 1-hour tournament: ~8.5 USDT0 yield
-- 4-hour tournament: ~34 USDT0 yield
-- Daily tournament: ~200 USDT0 yield
-
-All from **real economic activity**, not token inflation.
+4. Sustainable Rewards: Unlike other games, our rewards aren't "printed" they are harvested from real-world yield, creating a non-inflationary, long-term economic model.
 
 ---
 
@@ -144,7 +117,7 @@ function createQuickPlayGame(uint256 entryFee, uint256 maxPlayers)
 
 **Key Features:**
 
-- Provably fair randomness (Chainlink VRF)
+- Provably fair randomness (Hybrid block-based solution - see Hackathon Progress section)
 - Real-time yield tracking
 - Dynamic pool sizing
 - Multi-game mode support
@@ -199,7 +172,7 @@ Mint badges for milestones:
 ✅ **Compliant Gameplay**: USDT0-denominated games with institutional-grade infrastructure  
 ✅ **Real Yield**: 4-6% APY from RWA protocols (mETH, USDT0, Aave)  
 ✅ **No Waiting**: <30 second matchmaking via smart queue system  
-✅ **Fair & Transparent**: Chainlink VRF for provable randomness  
+✅ **Fair & Transparent**: Hybrid block-based randomness (VRF-ready architecture)  
 ✅ **Strategic Depth**: Contrarian mechanics reward psychological warfare  
 ✅ **Progressive Rewards**: NFT achievements, loyalty tiers, leaderboards
 
@@ -228,7 +201,7 @@ Mint badges for milestones:
                      │
 ┌─ ROUND 1-N ───────▼────────────────────────────────┐
 │ 1. All players choose HEAD or TAIL                  │
-│ 2. Chainlink VRF generates random outcome           │
+│ 2. Hybrid randomness generates random outcome     │
 │ 3. Minority survives, majority eliminated           │
 │ 4. Yield continues accumulating                     │
 │ 5. Repeat until 1 player remains                    │
@@ -269,14 +242,14 @@ Mint badges for milestones:
 
 ## 📊 Competitive Advantages
 
-| Feature                  | Inverse Arena     | Traditional GameFi | Web2 Games  |
-| ------------------------ | ----------------- | ------------------ | ----------- |
-| Real Yield Generation    | ✅ 4-6% APY (RWA) | ❌ Token inflation | ❌ No       |
-| Instant Matchmaking      | ✅ <30s           | ❌ 5-10 min        | ✅ Yes      |
-| Compliant Infrastructure | ✅ USDT0          | ❌ No              | ❌ No       |
-| True Asset Ownership     | ✅ NFTs           | ⚠️ Limited         | ❌ No       |
-| Sustainable Economics    | ✅ Deflationary   | ❌ Inflationary    | N/A         |
-| Institutional Ready      | ✅ KYC optional   | ❌ No              | ⚠️ Limited  |
+| Feature                  | Inverse Arena     | Traditional GameFi | Web2 Games |
+| ------------------------ | ----------------- | ------------------ | ---------- |
+| Real Yield Generation    | ✅ 4-6% APY (RWA) | ❌ Token inflation | ❌ No      |
+| Instant Matchmaking      | ✅ <30s           | ❌ 5-10 min        | ✅ Yes     |
+| Compliant Infrastructure | ✅ USDT0          | ❌ No              | ❌ No      |
+| True Asset Ownership     | ✅ NFTs           | ⚠️ Limited         | ❌ No      |
+| Sustainable Economics    | ✅ Deflationary   | ❌ Inflationary    | N/A        |
+| Institutional Ready      | ✅ KYC optional   | ❌ No              | ⚠️ Limited |
 
 ---
 
@@ -355,7 +328,7 @@ Mint badges for milestones:
 - USDT0 Protocol (Mantle's yield-bearing stablecoin)
 - mETH Protocol (Liquid staked ETH)
 - Aave V3 (DeFi lending)
-- Chainlink VRF (Provable randomness)
+- Hybrid Block-Based Randomness (VRF-ready for future migration)
 
 **Frontend:**
 
