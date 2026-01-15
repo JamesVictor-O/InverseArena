@@ -108,7 +108,6 @@ export function useGames(walletAddress?: string): UseGamesReturn {
           ? "Mantle Mainnet"
           : `Chain ID ${network.chainId}`;
 
-
       const switched = await requestMantleSepoliaNetwork();
       if (!switched) {
         throw new Error(
